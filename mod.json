@@ -1,0 +1,87 @@
+{
+	"geode": "5.11.2",
+	"gd": {
+		"win": "2.2091",
+		"android": "2.2091",
+		"mac": "2.2091",
+		"ios": "2.2091"
+	},
+	"id": "patasma.image_exporter",
+	"name": "Image Exporter",
+	"version": "v1.0.0",
+	"developer": "Patasma",
+	"description": "Importa imagenes al editor con 8 metodos distintos y un maximo de 10.000 objetos.",
+	"resources": {
+		"spritesheets": {
+			"ExportBtn": [
+				"res/gdImgExportBtn.png"
+			]
+		}
+	},
+	"settings": {
+		"title-render": {
+			"name": "Calidad y resultado",
+			"type": "title"
+		},
+		"quality": {
+			"type": "string",
+			"default": "Normal",
+			"name": "Calidad de calculo",
+			"one-of": ["Rapido", "Normal", "Alto"],
+			"description": "Afecta a los metodos 7 y 8 (rectangulos rotados): <cy>Alto</c> prueba mas candidatos por objeto y tarda mas."
+		},
+		"max-raster": {
+			"type": "int",
+			"default": 768,
+			"min": 128,
+			"max": 1024,
+			"name": "Resolucion interna maxima",
+			"description": "Lado maximo (px) de la imagen de trabajo. Mas alto = mas detalle posible pero mas memoria y tiempo."
+		},
+		"alpha-threshold": {
+			"type": "int",
+			"default": 128,
+			"min": 1,
+			"max": 255,
+			"name": "Umbral de transparencia",
+			"description": "Los pixeles con alfa menor que este valor se consideran transparentes y no generan objetos."
+		},
+		"title-gd": {
+			"name": "Objetos de Geometry Dash",
+			"type": "title"
+		},
+		"color-channel": {
+			"type": "int",
+			"default": 1010,
+			"min": 1,
+			"max": 1020,
+			"name": "Canal de color",
+			"description": "Canal de color base de los objetos (1010 = negro). <cr>No lo cambies</c> salvo que sepas lo que haces: el color se aplica con HSV sobre este canal."
+		},
+		"bleed": {
+			"type": "float",
+			"default": 0.15,
+			"min": 0.0,
+			"max": 2.0,
+			"name": "Solape entre rectangulos",
+			"description": "Unidades extra que se ensancha cada rectangulo para evitar lineas finas entre ellos."
+		},
+		"flip-rotation": {
+			"type": "bool",
+			"default": false,
+			"name": "Invertir giro",
+			"description": "Si los rectangulos rotados (metodos 7 y 8) salen girados al reves, activa esto."
+		},
+		"select-after": {
+			"type": "bool",
+			"default": true,
+			"name": "Seleccionar al colocar",
+			"description": "Selecciona los objetos importados para poder moverlos de golpe."
+		}
+	},
+	"tags": [
+		"editor",
+		"offline",
+		"utility"
+	]
+}

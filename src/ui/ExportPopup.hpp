@@ -44,6 +44,7 @@ protected:
     void onSizeInc(CCObject*) { stepSize(+1); }
     void onMonoPrev(CCObject*) { stepMono(-1); }
     void onMonoNext(CCObject*) { stepMono(+1); }
+    void onColorToggle(CCObject*);
 
     void stepMethod(int dir);
     void stepMono(int dir);
@@ -62,6 +63,8 @@ protected:
     gdx::Options makeOptions() const;
     gdx::GdExportOptions makeExportOptions() const;
     CCPoint placementOrigin() const;
+    void applyChannelColorsDirect(gdx::GdExportOptions const& eo);   // define los canales en los ajustes de color del nivel
+    bool colorModeOn() const { return m_colorCheck && m_mono > 0; }
 
     EditorUI* m_editor = nullptr;
     std::shared_ptr<const gdx::Image> m_image;
@@ -72,6 +75,7 @@ protected:
 
     int m_method = 2;       // método normal (0..7); BSP por defecto
     int m_mono = 0;         // 0 = ninguno (se usa el normal); 1..10 = estilo monocromo
+    bool m_colorCheck = false;   // estilos ligeros: colores de la imagen en canales de color (sin HSV)
     int m_budget = 10000;   // máximo permitido
     int m_sizeIdx = 3;
 
@@ -81,6 +85,8 @@ protected:
     CCLabelBMFont* m_sizeLabel = nullptr;
     CCLabelBMFont* m_monoLabel = nullptr;
     CCLabelBMFont* m_monoDescLabel = nullptr;
+    CCLabelBMFont* m_colorLabel = nullptr;
+    CCMenuItemToggler* m_colorToggle = nullptr;
     CCLabelBMFont* m_statusLabel = nullptr;
     CCLabelBMFont* m_noteLabel = nullptr;
     CCNode* m_previewHolder = nullptr;

@@ -12,7 +12,7 @@ namespace {
     constexpr int kMaxObjects = 10000;           // tope duro pedido: 10k objetos
     constexpr int kMinObjects = 500;
     constexpr int kBudgetStep = 500;
-    constexpr float kPopupW = 400.f, kPopupH = 380.f;
+    constexpr float kPopupW = 400.f, kPopupH = 400.f;
     constexpr float kPrevSize = 150.f;
     const int kSizes[] = {150, 300, 450, 600, 900, 1200, 1800, 2400, 3000, 4500, 6000};   // lado largo, unidades GD
     constexpr int kSizeCount = int(sizeof(kSizes) / sizeof(kSizes[0]));
@@ -49,6 +49,7 @@ bool ExportPopup::init(EditorUI* editor) {
     auto* mod = Mod::get();
     m_method = std::clamp(mod->getSavedValue<int>("method", 2), 0, gdx::kNormalMethodCount - 1);
     m_mono = std::clamp(mod->getSavedValue<int>("mono", 0), 0, kMonoCount);
+    m_colorCheck = mod->getSavedValue<bool>("color-channels", false);
     m_budget = std::clamp(mod->getSavedValue<int>("budget", kMaxObjects), kMinObjects, kMaxObjects);
     m_sizeIdx = std::clamp(mod->getSavedValue<int>("size-idx", 3), 0, kSizeCount - 1);
 
@@ -109,24 +110,33 @@ bool ExportPopup::init(EditorUI* editor) {
     m_monoDescLabel->setScale(0.8f);
     m_mainLayer->addChildAtPosition(m_monoDescLabel, Anchor::TopLeft, ccp(kPopupW / 2, -284.f));
 
+    // --- check: colores de la imagen en canales de color (solo estilos ligeros) ---
+    m_colorToggle = CCMenuItemToggler::createWithStandardSprites(this, menu_selector(ExportPopup::onColorToggle), 0.6f);
+    m_colorToggle->toggle(m_colorCheck);
+    m_buttonMenu->addChildAtPosition(m_colorToggle, Anchor::TopLeft, ccp(70.f, -308.f));
+    m_colorLabel = CCLabelBMFont::create("Colores en canales (sin HSV)", "bigFont.fnt");
+    m_colorLabel->setScale(0.42f);
+    m_colorLabel->setAnchorPoint({0.f, 0.5f});
+    m_mainLayer->addChildAtPosition(m_colorLabel, Anchor::TopLeft, ccp(90.f, -308.f));
+
     // --- estado ---
     m_statusLabel = CCLabelBMFont::create("Elige una imagen para empezar", "chatFont.fnt");
-    m_mainLayer->addChildAtPosition(m_statusLabel, Anchor::TopLeft, ccp(kPopupW / 2, -310.f));
+    m_mainLayer->addChildAtPosition(m_statusLabel, Anchor::TopLeft, ccp(kPopupW / 2, -332.f));
     m_noteLabel = CCLabelBMFont::create("", "chatFont.fnt", 380.f, kCCTextAlignmentCenter);
     m_noteLabel->setScale(0.7f);
     m_noteLabel->setColor({255, 200, 80});
-    m_mainLayer->addChildAtPosition(m_noteLabel, Anchor::TopLeft, ccp(kPopupW / 2, -328.f));
+    m_mainLayer->addChildAtPosition(m_noteLabel, Anchor::TopLeft, ccp(kPopupW / 2, -350.f));
 
     // --- botones ---
     auto pickSpr = ButtonSprite::create("Elegir imagen");
     pickSpr->setScale(0.8f);
     auto pickBtn = CCMenuItemSpriteExtra::create(pickSpr, this, menu_selector(ExportPopup::onPick));
-    m_buttonMenu->addChildAtPosition(pickBtn, Anchor::TopLeft, ccp(115.f, -356.f));
+    m_buttonMenu->addChildAtPosition(pickBtn, Anchor::TopLeft, ccp(115.f, -378.f));
 
     auto placeSpr = ButtonSprite::create("Colocar");
     placeSpr->setScale(0.8f);
     auto placeBtn = CCMenuItemSpriteExtra::create(placeSpr, this, menu_selector(ExportPopup::onPlace));
-    m_buttonMenu->addChildAtPosition(placeBtn, Anchor::TopLeft, ccp(285.f, -356.f));
+    m_buttonMenu->addChildAtPosition(placeBtn, Anchor::TopLeft, ccp(285.f, -378.f));
 
     auto infoBtn = CCMenuItemSpriteExtra::create(
         CCSprite::createWithSpriteFrameName("GJ_infoIcon_001.png"), this, menu_selector(ExportPopup::onInfo));
@@ -162,6 +172,7 @@ void ExportPopup::refreshLabels() {
         m_monoDescLabel->setString("Elige un estilo para usar solo tinta negra/blanca por canal, sin HSV y con pocos objetos.");
     }
     m_monoLabel->setOpacity(monoOn ? 255 : 150);
+    m_colorLabel->setOpacity(monoOn ? 255 : 110);       // el check solo afecta a los estilos ligeros
     m_monoLabel->limitLabelWidth(280.f, 0.5f, 0.2f);
 
     char buf[96];
@@ -176,6 +187,7 @@ void ExportPopup::refreshLabels() {
     auto* mod = Mod::get();
     mod->setSavedValue<int>("method", m_method);
     mod->setSavedValue<int>("mono", m_mono);
+    mod->setSavedValue<bool>("color-channels", m_colorCheck);
     mod->setSavedValue<int>("budget", m_budget);
     mod->setSavedValue<int>("size-idx", m_sizeIdx);
 }
@@ -199,6 +211,12 @@ void ExportPopup::stepMono(int dir) {
     m_mono = (m_mono + dir + n) % n;
     this->refreshLabels();
     this->scheduleRecompute();
+}
+
+void ExportPopup::onColorToggle(CCObject*) {
+    m_colorCheck = !m_colorCheck;                 // en el callback el toggler aún no ha cambiado su estado
+    this->refreshLabels();
+    if (m_mono > 0) this->scheduleRecompute();    // solo recalcula si hay un estilo ligero activo
 }
 
 void ExportPopup::stepBudget(int dir) {
@@ -271,6 +289,9 @@ gdx::Options ExportPopup::makeOptions() const {
     o.alphaThreshold = std::clamp(mod->getSettingValue<int>("alpha-threshold"), 1, 255);
     o.quality = qualityFromSetting();
     o.invertInk = mod->getSettingValue<bool>("invert-ink");
+    o.colorChannels = colorModeOn();
+    o.paletteSize = std::clamp(mod->getSettingValue<int>("palette-size"), 2, 64);
+    if (o.colorChannels) o.budget = std::max(1, o.budget - o.paletteSize);   // reserva para los triggers de color: el total nunca pasa del maximo
     o.asciiAspect = float(std::clamp(mod->getSettingValue<double>("ascii-aspect"), 0.3, 3.0));
     return o;
 }
@@ -286,6 +307,9 @@ gdx::GdExportOptions ExportPopup::makeExportOptions() const {
     eo.blackChannel = std::clamp(mod->getSettingValue<int>("black-channel"), 1, 1020);
     eo.whiteChannel = std::clamp(mod->getSettingValue<int>("white-channel"), 1, 1020);
     eo.asciiAdvance = std::clamp(mod->getSettingValue<double>("ascii-advance"), 1.0, 400.0);
+    // canales de la paleta: nunca el 1, y todos dentro de 2..999
+    int size = std::clamp(mod->getSettingValue<int>("palette-size"), 2, 64);
+    eo.paletteChannelStart = std::clamp(mod->getSettingValue<int>("palette-first-channel"), 2, 999 - size + 1);
     return eo;
 }
 
@@ -408,6 +432,39 @@ CCPoint ExportPopup::placementOrigin() const {
     return {0, 0};
 }
 
+// Define cada canal de la paleta en los ajustes de color del nivel (como hace el selector de color
+// del editor). Solo toca GJEffectManager::getColorAction y los campos de ColorAction.
+void ExportPopup::applyChannelColorsDirect(gdx::GdExportOptions const& eo) {
+    auto lel = LevelEditorLayer::get();
+    if (!lel) return;
+    std::vector<GJEffectManager*> managers;
+    if (lel->m_effectManager) managers.push_back(lel->m_effectManager);
+    if (lel->m_levelSettings && lel->m_levelSettings->m_effectManager &&
+        lel->m_levelSettings->m_effectManager != lel->m_effectManager) {
+        managers.push_back(lel->m_levelSettings->m_effectManager);
+    }
+    gdx::ChannelMap cmap = gdx::buildChannelMap(m_result);
+    for (size_t i = 0; i < cmap.colors.size(); ++i) {
+        int channel = std::min(999, eo.paletteChannelStart + int(i));
+        if (channel < 2) continue;                                    // el canal 1 nunca se toca
+        ccColor3B c = {cmap.colors[i][0], cmap.colors[i][1], cmap.colors[i][2]};
+        for (auto* mgr : managers) {
+            auto* action = mgr->getColorAction(channel);
+            if (!action) continue;
+            action->m_color = c;
+            action->m_fromColor = c;
+            action->m_toColor = c;
+            action->m_currentOpacity = 1.f;
+            action->m_fromOpacity = 1.f;
+            action->m_toOpacity = 1.f;
+            action->m_blending = false;
+            action->m_playerColor = -1;                               // sin color de jugador
+            action->m_copyID = 0;                                     // no copia otro canal
+        }
+    }
+    for (auto* mgr : managers) mgr->processColors();                  // recalcula los colores activos
+}
+
 void ExportPopup::onPlace(CCObject*) {
     if (m_job) {
         FLAlertLayer::create("Image Exporter", "Todavia se esta calculando. Espera a que termine.", "OK")->show();
@@ -436,6 +493,18 @@ void ExportPopup::onPlace(CCObject*) {
     if (created && created->count() > 0 && mod->getSettingValue<bool>("select-after") && m_editor) {
         m_editor->selectObjects(created, true);
     }
+
+    // canales de color de la paleta (solo estilos ligeros con el check activado)
+    if (m_result.colored) {
+        auto mode = mod->getSettingValue<std::string>("palette-mode");
+        bool useDirect = mode != "Solo triggers";
+        bool useTriggers = mode != "Solo directo";
+        if (useDirect) this->applyChannelColorsDirect(eo);
+        if (useTriggers) {
+            std::string trig = gdx::toGdColorTriggers(m_result, eo);
+            if (!trig.empty()) lel->createObjectsFromString(trig.c_str(), true, true);   // sin seleccionarlos
+        }
+    }
     char msg[64];
     std::snprintf(msg, sizeof msg, "Imagen colocada: %zu objetos", count);
     Notification::create(msg, NotificationIcon::Success, 2.f)->show();
@@ -451,6 +520,7 @@ void ExportPopup::onInfo(CCObject*) {
         "- <cg>5 Regiones</c>: ilustraciones y pixel art (muy pocos objetos).\n"
         "- <cg>8 Hibrido</c>: maxima calidad, tarda un poco mas.\n"
         "<cy>Estilos monocromos</c> (seccion de abajo): tinta negra/blanca por canal, <cg>sin HSV</c> y pocos objetos. "
+        "Con <cg>Colores en canales</c> los colores de la imagen se reparten en canales de color (desde el 2; <cy>nunca el 1</c>), sin HSV.\n"
         "El <cg>ASCII</c> usa objetos de texto: elige una fuente monoespaciada en el nivel y calibra el ancho de caracter en los ajustes.\n"
         "Con <cy>un objeto seleccionado</c> la imagen se centra en el; si no, en el centro de la vista.\n"
         "La importacion no se puede deshacer: <cr>guarda antes</c>. Quedan seleccionados para moverlos.",

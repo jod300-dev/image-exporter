@@ -21,6 +21,44 @@ struct MonoCtx {
     bool hasAlpha = false;
     std::vector<double> sat;             // suma acumulada de `dark`
     uint8_t ink = 0, paper = 255;
+    // --- modo color (canales de paleta) ---
+    bool color = false;
+    double colorRadius = 4.0;
+    std::vector<double> csr, csg, csb, cn;   // sumas acumuladas de RGB y recuento (solo píxeles opacos)
+
+    // Color de "tinta" que, aplicado con la cobertura local sobre el papel, reproduce el color de la imagen.
+    void inkColorAt(double cx, double cy, double r, uint8_t& R, uint8_t& G, uint8_t& B) const {
+        R = G = B = ink;
+        if (!color) return;
+        int x0 = std::clamp(int(std::floor(cx - r)), 0, W), x1 = std::clamp(int(std::ceil(cx + r)), 0, W);
+        int y0 = std::clamp(int(std::floor(cy - r)), 0, H), y1 = std::clamp(int(std::ceil(cy + r)), 0, H);
+        if (x1 <= x0 || y1 <= y0) return;
+        size_t st = size_t(W) + 1;
+        auto q = [&](const std::vector<double>& a) {
+            return a[size_t(y1) * st + x1] - a[size_t(y0) * st + x1] - a[size_t(y1) * st + x0] + a[size_t(y0) * st + x0];
+        };
+        double n = q(cn);
+        if (n <= 0) return;
+        double d = std::max(boxMean(cx, cy, r), 0.10), pr = q(csr) / n, pg = q(csg) / n, pb = q(csb) / n;
+        // 1) tinta "física": la que, con la cobertura d sobre el papel, da el color de la imagen
+        double ir = (pr - double(paper) * (1.0 - d)) / d, ig = (pg - double(paper) * (1.0 - d)) / d, ib = (pb - double(paper) * (1.0 - d)) / d;
+        auto inGamut = [](double v) { return v >= -2.0 && v <= 257.0; };
+        if (inGamut(ir) && inGamut(ig) && inGamut(ib)) {
+            R = uint8_t(std::clamp(ir + 0.5, 0.0, 255.0)); G = uint8_t(std::clamp(ig + 0.5, 0.0, 255.0)); B = uint8_t(std::clamp(ib + 0.5, 0.0, 255.0));
+            return;
+        }
+        // 2) si no cabe (poca cobertura => saldría negro): tono local con luminosidad acotada,
+        //    para que el color se note y contraste con el papel
+        double lum = 0.299 * pr + 0.587 * pg + 0.114 * pb;
+        if (ink == 0) {                                  // tinta oscura sobre papel claro
+            const double hi = 0.42 * 255.0;
+            if (lum > hi) { double k = hi / std::max(lum, 1e-6); pr *= k; pg *= k; pb *= k; }
+        } else {                                         // tinta clara sobre papel oscuro
+            const double lo = 0.58 * 255.0;
+            if (lum < lo) { double t = (lo - lum) / std::max(255.0 - lum, 1e-6); pr += (255 - pr) * t; pg += (255 - pg) * t; pb += (255 - pb) * t; }
+        }
+        R = uint8_t(std::clamp(pr + 0.5, 0.0, 255.0)); G = uint8_t(std::clamp(pg + 0.5, 0.0, 255.0)); B = uint8_t(std::clamp(pb + 0.5, 0.0, 255.0));
+    }
 
     // media de `dark` en un cuadrado de radio r alrededor de (cx, cy), en unidades del raster
     double boxMean(double cx, double cy, double r) const {
@@ -69,6 +107,21 @@ inline MonoCtx monoPrepare(const Image& src, const Options& o, int maxSide) {
         float y = std::clamp((Y[i] - lo) / (hi - lo), 0.f, 1.f);
         m.dark[i] = o.invertInk ? y : 1.f - y;
     }
+    if (o.colorChannels) {
+        m.color = true;
+        m.colorRadius = std::max(2.0, 0.015 * std::max(w, h));
+        size_t st2 = size_t(w) + 1, sz = st2 * (h + 1);
+        m.csr.assign(sz, 0.0); m.csg.assign(sz, 0.0); m.csb.assign(sz, 0.0); m.cn.assign(sz, 0.0);
+        for (int y = 0; y < h; ++y) {
+            double r0 = 0, g0 = 0, b0 = 0, n0 = 0;
+            for (int x = 0; x < w; ++x) {
+                size_t i = size_t(y) * w + x;
+                if (opq[i]) { const uint8_t* p = &ras.rgba[i * 4]; r0 += p[0]; g0 += p[1]; b0 += p[2]; n0 += 1; }
+                size_t a = size_t(y + 1) * st2 + (x + 1), up = size_t(y) * st2 + (x + 1);
+                m.csr[a] = m.csr[up] + r0; m.csg[a] = m.csg[up] + g0; m.csb[a] = m.csb[up] + b0; m.cn[a] = m.cn[up] + n0;
+            }
+        }
+    }
     size_t st = size_t(w) + 1;
     m.sat.assign(st * (h + 1), 0.0);
     for (int y = 0; y < h; ++y) {
@@ -84,7 +137,29 @@ inline MonoCtx monoPrepare(const Image& src, const Options& o, int maxSide) {
 inline Shape inkShape(const MonoCtx& m, float cx, float cy, float len, float th, float rotDeg, int z = 1) {
     Shape s; s.cx = cx; s.cy = cy; s.w = len; s.h = th; s.rot = rotDeg;
     s.r = s.g = s.b = m.ink; s.z = int16_t(z);
+    if (m.color) m.inkColorAt(cx, cy, m.colorRadius, s.r, s.g, s.b);
     return s;
+}
+
+// Reduce los colores de la tinta a una paleta de K colores (cada uno será un canal de GD).
+inline void quantizeInkColors(std::vector<Shape>& shapes, int K, Result& res) {
+    std::vector<size_t> idx;
+    for (size_t i = 0; i < shapes.size(); ++i) if (shapes[i].z >= 1) idx.push_back(i);
+    res.colored = true;
+    if (idx.empty()) return;
+    Image im; im.w = int(idx.size()); im.h = 1; im.rgba.resize(idx.size() * 4);
+    for (size_t k = 0; k < idx.size(); ++k) {
+        const Shape& s = shapes[idx[k]];
+        im.rgba[k * 4] = s.r; im.rgba[k * 4 + 1] = s.g; im.rgba[k * 4 + 2] = s.b; im.rgba[k * 4 + 3] = 255;
+    }
+    Quantizer qz(im, 1);
+    std::vector<int16_t> lab; std::vector<std::array<uint8_t, 3>> pal;
+    qz.labels(std::max(2, K), lab, pal);
+    for (size_t k = 0; k < idx.size(); ++k) {
+        if (lab[k] < 0) continue;
+        Shape& s = shapes[idx[k]];
+        s.r = pal[size_t(lab[k])][0]; s.g = pal[size_t(lab[k])][1]; s.b = pal[size_t(lab[k])][2];
+    }
 }
 
 // Papel: un rectángulo del color de fondo (solo si la imagen no tiene transparencia).
@@ -310,6 +385,22 @@ inline std::vector<uint8_t> inkMask(const MonoCtx& m) {
     return c;
 }
 
+// Versión con color: los rectángulos solo fusionan píxeles del mismo color de paleta.
+inline size_t binaryRectsColor(const MonoCtx& m, const std::vector<uint8_t>& mask, int K, size_t limit, std::vector<Shape>* out) {
+    Image ink; ink.w = m.W; ink.h = m.H; ink.rgba.assign(size_t(m.W) * m.H * 4, 0);
+    for (int y = 0; y < m.H; ++y)
+        for (int x = 0; x < m.W; ++x) {
+            if (!mask[size_t(y) * m.W + x]) continue;
+            uint8_t* p = ink.at(x, y);
+            m.inkColorAt(x + 0.5, y + 0.5, 1.5, p[0], p[1], p[2]);
+            p[3] = 255;
+        }
+    Quantizer qz(ink, 1);
+    std::vector<int16_t> lab; std::vector<std::array<uint8_t, 3>> pal;
+    qz.labels(std::max(2, K), lab, pal);
+    return greedyRects(lab, m.W, m.H, pal, limit, out);
+}
+
 // style: 0 = Dither, 1 = Ink. Busca la mayor resolución que cabe en el presupuesto.
 inline std::vector<Shape> binaryStyleShapes(const Image& src, const Options& o, int style, Result& res, Progress* prog) {
     size_t B = size_t(std::max(1, o.budget - 1));
@@ -317,10 +408,17 @@ inline std::vector<Shape> binaryStyleShapes(const Image& src, const Options& o, 
         m = monoPrepare(src, o, side);
         mask = style == 0 ? bayerMask(m) : inkMask(m);
     };
+    auto countFor = [&](const MonoCtx& m, const std::vector<uint8_t>& mask, std::vector<Shape>* out) -> size_t {
+        if (m.color) return binaryRectsColor(m, mask, o.paletteSize, B, out);
+        size_t c = 0;
+        if (!out) { binaryRects(mask, m.W, m.H, m.ink, B, &c); return c; }
+        *out = binaryRects(mask, m.W, m.H, m.ink, B, nullptr);
+        return out->size();
+    };
     int lo = 12, hi = std::min(o.maxRaster, 1024);
     int best = lo;
     {   // mayor lado con recuento <= B
-        auto fits = [&](int side) { MonoCtx m; std::vector<uint8_t> mask; build(side, m, mask); size_t c = 0; binaryRects(mask, m.W, m.H, m.ink, B, &c); return c <= B; };
+        auto fits = [&](int side) { MonoCtx m; std::vector<uint8_t> mask; build(side, m, mask); return countFor(m, mask, nullptr) <= B; };
         if (fits(hi)) best = hi;
         else {
             for (int it = 0; it < 14 && hi - lo > 1; ++it) {
@@ -332,8 +430,9 @@ inline std::vector<Shape> binaryStyleShapes(const Image& src, const Options& o, 
         }
     }
     MonoCtx m; std::vector<uint8_t> mask; build(best, m, mask);
-    std::vector<Shape> out = binaryRects(mask, m.W, m.H, m.ink, B, nullptr);
+    std::vector<Shape> out; countFor(m, mask, &out);
     for (auto& s : out) s.z = 1;
+    if (m.color) res.colored = true;
     addPaper(m, out);
     res.rasterW = m.W; res.rasterH = m.H; res.inkValue = m.ink;
     return out;
@@ -479,11 +578,11 @@ inline void asciiShapes(const Image& src, const Options& o, Result& res) {
     const double cw = double(m.W) / cols, chh = double(m.H) / rows;
     res.mono = true; res.inkValue = m.ink;
     res.rasterW = cols; res.rasterH = rows;
-    res.previewImg.w = cols * 4; res.previewImg.h = rows * 4;
-    res.previewImg.rgba.assign(size_t(res.previewImg.w) * res.previewImg.h * 4, 0);
-    for (int r = 0; r < rows; ++r) {
-        std::string line(size_t(cols), ' ');
-        bool any = false;
+
+    std::vector<std::string> lines(size_t(rows), std::string(size_t(cols), ' '));
+    std::vector<float> dens(size_t(rows) * cols, 0.f);
+    Image cellImg; cellImg.w = cols; cellImg.h = rows; cellImg.rgba.assign(size_t(cols) * rows * 4, 0);
+    for (int r = 0; r < rows; ++r)
         for (int c = 0; c < cols; ++c) {
             double x = (c + 0.5) * cw, y = (r + 0.5) * chh;
             double d = m.boxMean(x, y, std::max(cw, chh) * 0.5);
@@ -502,19 +601,75 @@ inline void asciiShapes(const Image& src, const Options& o, Result& res) {
                 int idx = std::clamp(int(std::lround(std::pow(std::min(1.0, d), 0.9) * (ramp.size() - 1))), 0, int(ramp.size()) - 1);
                 ch = ramp[size_t(idx)];
             }
-            line[size_t(c)] = ch;
-            if (ch != ' ') any = true;
-            // vista previa: bloque con la tinta proporcional a la oscuridad
-            uint8_t v = uint8_t(std::lround(double(m.paper) + (double(m.ink) - m.paper) * std::min(1.0, d)));
-            for (int yy = 0; yy < 4; ++yy) for (int xx = 0; xx < 4; ++xx) {
-                uint8_t* p = res.previewImg.at(c * 4 + xx, r * 4 + yy);
-                p[0] = p[1] = p[2] = v; p[3] = 255;
+            lines[size_t(r)][size_t(c)] = ch;
+            dens[size_t(r) * cols + c] = float(std::min(1.0, d));
+            if (ch != ' ') {
+                uint8_t* p = cellImg.at(c, r);
+                m.inkColorAt(x, y, std::max(cw, chh) * 0.5, p[0], p[1], p[2]);
+                p[3] = 255;
             }
         }
-        if (any) res.textRows.push_back({cols * 0.5f, r + 0.5f, line});
+
+    // colores de paleta por celda (solo con canales de color)
+    std::vector<int16_t> lab; std::vector<std::array<uint8_t, 3>> pal;
+    if (m.color) { Quantizer qz(cellImg, 1); qz.labels(std::max(2, o.paletteSize), lab, pal); res.colored = true; }
+
+    // vista previa: bloques de tinta proporcionales a la densidad, con el color de la celda si lo hay
+    res.previewImg.w = cols * 4; res.previewImg.h = rows * 4;
+    res.previewImg.rgba.assign(size_t(res.previewImg.w) * res.previewImg.h * 4, 0);
+    for (int r = 0; r < rows; ++r)
+        for (int c = 0; c < cols; ++c) {
+            double d = dens[size_t(r) * cols + c];
+            uint8_t col[3] = {m.ink, m.ink, m.ink};
+            if (m.color && lab[size_t(r) * cols + c] >= 0) { auto const& pc = pal[size_t(lab[size_t(r) * cols + c])]; col[0] = pc[0]; col[1] = pc[1]; col[2] = pc[2]; }
+            for (int yy = 0; yy < 4; ++yy) for (int xx = 0; xx < 4; ++xx) {
+                uint8_t* p = res.previewImg.at(c * 4 + xx, r * 4 + yy);
+                for (int k = 0; k < 3; ++k) p[k] = uint8_t(std::lround(double(m.paper) + (double(col[k]) - m.paper) * d));
+                p[3] = 255;
+            }
+        }
+
+    if (!m.color) {
+        for (int r = 0; r < rows; ++r)
+            if (lines[size_t(r)].find_first_not_of(' ') != std::string::npos)
+                res.textRows.push_back({cols * 0.5f, r + 0.5f, lines[size_t(r)]});
+    } else {
+        // cada fila se parte en tramos del mismo color de paleta (un objeto de texto por tramo)
+        for (int r = 0; r < rows; ++r) {
+            struct Run { int a, b, label, ink; };
+            std::vector<Run> runs;
+            int cur = -1;
+            for (int c = 0; c < cols; ++c) {
+                int L = lab[size_t(r) * cols + c];
+                bool inked = lines[size_t(r)][size_t(c)] != ' ';
+                if (inked) cur = L; else if (cur < 0) continue;            // los espacios heredan el color anterior
+                if (!runs.empty() && runs.back().label == cur) { runs.back().b = c; runs.back().ink += inked ? 1 : 0; }
+                else runs.push_back({c, c, cur, inked ? 1 : 0});
+            }
+            const int kMinInk = 14;                                         // tramos con poca tinta adoptan el color vecino (menos objetos)
+            for (size_t i = 0; i < runs.size(); ++i)
+                if (runs[i].ink < kMinInk) {
+                    if (i > 0) runs[i].label = runs[i - 1].label;
+                    else if (runs.size() > 1) runs[i].label = runs[i + 1].label;
+                }
+            std::vector<Run> merged;
+            for (auto const& rn : runs) {
+                if (!merged.empty() && merged.back().label == rn.label) { merged.back().b = rn.b; merged.back().ink += rn.ink; }
+                else merged.push_back(rn);
+            }
+            for (auto const& rn : merged) {
+                if (rn.ink == 0 || rn.label < 0) continue;
+                TextRow t; t.text = lines[size_t(r)].substr(size_t(rn.a), size_t(rn.b - rn.a + 1));
+                t.cx = (rn.a + rn.b + 1) * 0.5f; t.cy = r + 0.5f; t.colored = true;
+                auto const& pc = pal[size_t(rn.label)]; t.r = pc[0]; t.g = pc[1]; t.b = pc[2];
+                res.textRows.push_back(t);
+            }
+        }
     }
     addPaper(m, res.shapes);
-    res.note = "ASCII: elige una fuente monoespaciada en el nivel (p. ej. fuente 5) y ajusta ancho/alto de caracter en los ajustes.";
+    res.note = m.color
+        ? "ASCII a color: define canales con triggers de color. Usa fuente monoespaciada y calibra el ancho de caracter."
+        : "ASCII: elige una fuente monoespaciada en el nivel (p. ej. fuente 5) y ajusta ancho/alto de caracter en los ajustes.";
 }
 
 // ------------------------------------------------------------- despacho -----
@@ -526,16 +681,19 @@ inline std::vector<Shape> monoShapes(const Image& src, Method method, const Opti
     int side = std::min(o.maxRaster, 400);
     MonoCtx m = monoPrepare(src, o, side);
     res.rasterW = m.W; res.rasterH = m.H; res.inkValue = m.ink;
+    std::vector<Shape> out;
     switch (method) {
-        case Method::Halftone: return halftoneShapes(m, o.budget, prog);
-        case Method::Engrave:  return engraveShapes(m, o.budget, prog);
-        case Method::Hatch:    return hatchShapes(m, o.budget, prog);
-        case Method::Stipple:  return stippleShapes(m, o.budget, o.seed, prog);
-        case Method::Strokes:  return strokesShapes(m, o.budget, prog);
-        case Method::Spiral:   return spiralShapes(m, o.budget, prog);
-        case Method::Truchet:  return truchetShapes(m, o.budget, prog);
-        default: return {};
+        case Method::Halftone: out = halftoneShapes(m, o.budget, prog); break;
+        case Method::Engrave:  out = engraveShapes(m, o.budget, prog); break;
+        case Method::Hatch:    out = hatchShapes(m, o.budget, prog); break;
+        case Method::Stipple:  out = stippleShapes(m, o.budget, o.seed, prog); break;
+        case Method::Strokes:  out = strokesShapes(m, o.budget, prog); break;
+        case Method::Spiral:   out = spiralShapes(m, o.budget, prog); break;
+        case Method::Truchet:  out = truchetShapes(m, o.budget, prog); break;
+        default: break;
     }
+    if (m.color) quantizeInkColors(out, o.paletteSize, res);      // colores -> paleta -> canales
+    return out;
 }
 
 } // namespace gdx

@@ -7,6 +7,8 @@
 //  (por defecto 1010, negro), igual que hace el mod "Art importer".
 // ============================================================================
 #pragma once
+#include <array>
+#include <map>
 #include "core.hpp"
 
 namespace gdx {
@@ -25,6 +27,10 @@ struct GdExportOptions {
     // ASCII: ancho (unidades) que ocupa un carácter con escala 1 en la fuente del nivel.
     // Depende de la fuente; se calibra en los ajustes.
     double asciiAdvance = 24.0;
+    // Colores en canales (estilos ligeros con "colorChannels"): primer canal usado (nunca el 1)
+    // y posición de los triggers de color que definen cada canal (antes del inicio del nivel).
+    int paletteChannelStart = 2;
+    double triggerX = -90.0, triggerY0 = 15.0;
 };
 
 namespace detail {
@@ -58,6 +64,26 @@ inline void appendGdHsv(std::string& s, uint8_t R, uint8_t G, uint8_t B) {
     detail::appendNum(s, val, 3); s += "a1a1";
 }
 
+// Colores realmente usados por la tinta, en orden de aparición -> canal = start + índice.
+struct ChannelMap {
+    std::vector<std::array<uint8_t, 3>> colors;
+    std::map<uint32_t, int> index;
+    static uint32_t key(uint8_t r, uint8_t g, uint8_t b) { return (uint32_t(r) << 16) | (uint32_t(g) << 8) | b; }
+    int add(uint8_t r, uint8_t g, uint8_t b) {
+        auto it = index.find(key(r, g, b));
+        if (it != index.end()) return it->second;
+        int i = int(colors.size()); colors.push_back({r, g, b}); index[key(r, g, b)] = i; return i;
+    }
+};
+
+inline ChannelMap buildChannelMap(const Result& r) {
+    ChannelMap m;
+    if (!r.colored) return m;
+    for (const Shape& s : r.shapes) if (s.z >= 1) m.add(s.r, s.g, s.b);
+    for (const TextRow& t : r.textRows) if (t.colored) m.add(t.r, t.g, t.b);
+    return m;
+}
+
 struct GdSize { double w, h; };
 inline GdSize gdImageSize(const Result& r, const GdExportOptions& o) {
     double a = r.aspect > 0 ? r.aspect : 1.0;
@@ -88,6 +114,8 @@ inline std::string toGdString(const Result& r, const GdExportOptions& o) {
     out.reserve(r.shapes.size() * 112);
     GdSize sz = gdImageSize(r, o);
     const double ux = sz.w / r.rasterW, uy = sz.h / r.rasterH;
+    const ChannelMap cmap = buildChannelMap(r);
+    auto channelOf = [&](uint8_t R, uint8_t G, uint8_t B) { return std::min(999, o.paletteChannelStart + cmap.index.at(ChannelMap::key(R, G, B))); };
     for (const Shape& s : r.shapes) {
         double x = o.originX + (s.cx - r.rasterW * 0.5) * ux;
         double y = o.originY - (s.cy - r.rasterH * 0.5) * uy;
@@ -98,7 +126,9 @@ inline std::string toGdString(const Result& r, const GdExportOptions& o) {
         out += ",2,"; detail::appendNum(out, x, 3);
         out += ",3,"; detail::appendNum(out, y, 3);
         bool isBlack = s.r == 0 && s.g == 0 && s.b == 0, isWhite = s.r == 255 && s.g == 255 && s.b == 255;
-        if (o.monoFastPath && (isBlack || isWhite)) {
+        if (r.colored && s.z >= 1) {                       // color de paleta: canal propio, sin HSV
+            out += ",21,"; out += std::to_string(channelOf(s.r, s.g, s.b));
+        } else if (o.monoFastPath && (isBlack || isWhite)) {
             out += ",21,"; out += std::to_string(isBlack ? o.blackChannel : o.whiteChannel);
         } else {
             out += ",21,"; out += std::to_string(o.colorChannel);
@@ -117,9 +147,10 @@ inline std::string toGdString(const Result& r, const GdExportOptions& o) {
     }
     // Arte ASCII: una fila = un objeto de texto (914) con el contenido en base64 (clave 31)
     if (!r.textRows.empty()) {
-        const int ch = r.inkValue == 0 ? o.blackChannel : o.whiteChannel;
+        const int baseCh = r.inkValue == 0 ? o.blackChannel : o.whiteChannel;
         const double scale = ux / std::max(0.01, o.asciiAdvance);
         for (const TextRow& t : r.textRows) {
+            const int ch = t.colored ? channelOf(t.r, t.g, t.b) : baseCh;
             out += "1,914,2,"; detail::appendNum(out, o.originX + (t.cx - r.rasterW * 0.5) * ux, 3);
             out += ",3,"; detail::appendNum(out, o.originY - (t.cy - r.rasterH * 0.5) * uy, 3);
             out += ",21,"; out += std::to_string(ch);
@@ -130,6 +161,26 @@ inline std::string toGdString(const Result& r, const GdExportOptions& o) {
         }
     }
     if (!out.empty() && out.back() == ';') out.pop_back();   // createObjectsFromString no necesita el último ';'
+    return out;
+}
+
+// Triggers de color (objeto 899) que fijan el color de cada canal al empezar el nivel.
+// Claves: 7/8/9 = RGB, 10 = duración, 23 = canal destino, 35 = opacidad, 36 = 1 (como en la referencia de SPWN).
+// Se colocan a la izquierda del inicio (x < 0) para que se apliquen al arrancar.
+inline std::string toGdColorTriggers(const Result& r, const GdExportOptions& o) {
+    std::string out;
+    ChannelMap cmap = buildChannelMap(r);
+    for (size_t i = 0; i < cmap.colors.size(); ++i) {
+        int ch = std::min(999, o.paletteChannelStart + int(i));
+        out += "1,899,2,"; detail::appendNum(out, o.triggerX, 1);
+        out += ",3,"; detail::appendNum(out, o.triggerY0 + 30.0 * double(i), 1);
+        out += ",36,1,7,"; out += std::to_string(cmap.colors[i][0]);
+        out += ",8,"; out += std::to_string(cmap.colors[i][1]);
+        out += ",9,"; out += std::to_string(cmap.colors[i][2]);
+        out += ",10,0,35,1,23,"; out += std::to_string(ch);
+        out += ';';
+    }
+    if (!out.empty() && out.back() == ';') out.pop_back();
     return out;
 }
 

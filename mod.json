@@ -123,6 +123,37 @@
 			"max": 3.0,
 			"name": "ASCII: alto/ancho de caracter",
 			"description": "Proporcion alto/ancho de una celda de texto. Con fuentes monoespaciadas suele estar entre 1.0 y 2.0."
+		},
+		"title-palette": {
+			"name": "Colores en canales (estilos ligeros)",
+			"type": "title"
+		},
+		"palette-size": {
+			"type": "int",
+			"default": 12,
+			"min": 2,
+			"max": 64,
+			"name": "Colores de la paleta",
+			"description": "Cuantos canales de color se crean (incluye el del papel). Menos = mas ligero."
+		},
+		"palette-first-channel": {
+			"type": "int",
+			"default": 2,
+			"min": 2,
+			"max": 999,
+			"name": "Primer canal de la paleta",
+			"description": "Los canales se asignan desde este numero hacia arriba. <cr>Nunca se usa el canal 1.</c> Revisa que no pisen canales que ya uses."
+		},
+		"palette-mode": {
+			"type": "string",
+			"default": "Directo y triggers",
+			"name": "Como crear los canales",
+			"one-of": [
+				"Directo y triggers",
+				"Solo directo",
+				"Solo triggers"
+			],
+			"description": "<cy>Directo</c>: define los colores en los ajustes del nivel (se ven en el editor). <cy>Triggers</c>: crea un trigger de color por canal a la izquierda del inicio (se aplican al jugar). Si algo falla con el modo directo, usa <cg>Solo triggers</c>."
 		}
 	},
 	"tags": [

@@ -4,6 +4,7 @@
 // ============================================================================
 #pragma once
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -65,12 +66,16 @@ struct Options {
     uint32_t seed = 1337;
     bool invertInk = false;              // estilos monocromos: tinta blanca sobre fondo negro
     float asciiAspect = 1.0f;            // ASCII: alto/ancho de una celda de carácter (según la fuente)
+    bool colorChannels = false;          // estilos ligeros: colores de la imagen en canales (sin HSV)
+    int paletteSize = 12;                // nº máximo de colores/canales cuando colorChannels está activo
 };
 
 // Una fila de arte ASCII: se exporta como UN objeto de texto de GD.
 struct TextRow {
-    float cx = 0, cy = 0;                // centro de la fila (unidades del raster = celdas)
+    float cx = 0, cy = 0;                // centro del texto (unidades del raster = celdas)
     std::string text;
+    bool colored = false;                // true: usa el color (r,g,b) en un canal de la paleta
+    uint8_t r = 0, g = 0, b = 0;
 };
 
 struct Progress {
@@ -88,7 +93,9 @@ struct Result {
     bool hadAlpha = false;
     bool mono = false;                   // solo tinta/papel (negro y blanco), sin HSV
     uint8_t inkValue = 0;                // 0 = tinta negra, 255 = tinta blanca
+    bool colored = false;                // la tinta usa colores de paleta (cada color = un canal, sin HSV)
     std::vector<TextRow> textRows;       // arte ASCII (objetos de texto)
+    std::vector<std::array<uint8_t, 3>> palette;   // colores de los canales (índice = Shape::pal)
     Image previewImg;                    // vista previa propia (ASCII); vacía = renderizar `shapes`
     std::string note;                    // info extra para mostrar al usuario
 };

@@ -59,6 +59,15 @@ Pensados para ser **ligeros**: tinta negra (canal 1010) sobre papel blanco (cana
 Cada estilo tiene una separacion minima visible, asi que **con 10.000 de limite suelen usar bastantes menos** (sombreado cruzado ~2.000, grabado ~4.600-6.500, ASCII ~150).
 Ajustes utiles: *Tinta blanca sobre fondo negro*, *Canal negro/blanco*, *ASCII: ancho de caracter* y *ASCII: alto/ancho de caracter*.
 
+### Colores en canales (check de la seccion monocroma)
+Con el check **"Colores en canales (sin HSV)"** los estilos 9-18 usan los **colores de la imagen** sin HSV:
+* Los colores se reducen a una paleta (por defecto 12; ajustes: *Colores de la paleta*). El papel es el color 0 y la tinta usa el resto.
+* Cada color es un **canal de color propio, desde el 2** (ajuste *Primer canal de la paleta*; **el canal 1 nunca se usa**) y cada objeto solo lleva `21,<canal>`: ninguna clave de HSV.
+* Los canales se crean de dos formas (ajuste *Como crear los canales*): **Directo** (escribe el color en los ajustes de color del nivel, visible en el editor) y **Triggers** (un trigger de color por canal a la izquierda del inicio, x = -90, que se aplica al jugar). Por defecto, ambos.
+* El ASCII en color parte cada fila en tramos del mismo color (un objeto de texto por tramo, ~300 objetos).
+* Los triggers cuentan como objetos: se reservan del limite para no pasar de 10.000.
+* **Sin verificar en GD:** el modo *Directo* usa `GJEffectManager::getColorAction` y los campos de `ColorAction` (segun los bindings 2.2081), y los triggers usan el objeto 899 con claves 7/8/9/10/23/35. Si algo falla con *Directo*, usa *Solo triggers*.
+
 ### Sobre el ASCII (leer)
 * El objeto de texto es el **914**, con el texto en base64 en la clave **31** (formato tomado de librerias de la comunidad, no probado aqui en GD).
 * **La fuente es un ajuste del nivel entero**, no del objeto: elige una monoespaciada (p. ej. la fuente 5, Joystix) en los ajustes del nivel.

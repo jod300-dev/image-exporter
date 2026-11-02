@@ -11,6 +11,7 @@ using namespace geode::prelude;
 
 // Ventana del exportador: elegir imagen, método, presupuesto de objetos y tamaño,
 // ver una vista previa del resultado y colocarlo en el editor.
+// Debajo de los 8 métodos normales hay una sección aparte de estilos monocromos.
 class ExportPopup : public geode::Popup {
 public:
     static ExportPopup* create(EditorUI* editor);
@@ -34,17 +35,21 @@ protected:
     // acciones de los botones
     void onPick(CCObject*);
     void onPlace(CCObject*);
+    void onInfo(CCObject*);
     void onMethodPrev(CCObject*) { stepMethod(-1); }
     void onMethodNext(CCObject*) { stepMethod(+1); }
     void onBudgetDec(CCObject*) { stepBudget(-1); }
     void onBudgetInc(CCObject*) { stepBudget(+1); }
     void onSizeDec(CCObject*) { stepSize(-1); }
     void onSizeInc(CCObject*) { stepSize(+1); }
-    void onInfo(CCObject*);
+    void onMonoPrev(CCObject*) { stepMono(-1); }
+    void onMonoNext(CCObject*) { stepMono(+1); }
 
     void stepMethod(int dir);
+    void stepMono(int dir);
     void stepBudget(int dir);
     void stepSize(int dir);
+    gdx::Method effectiveMethod() const;       // el estilo monocromo, si hay uno activo; si no, el normal
     void refreshLabels();
 
     void loadImageBytes(std::vector<uint8_t> const& bytes);
@@ -55,6 +60,7 @@ protected:
     void buildPreview();
     void setStatus(std::string const& s, std::string const& note = "");
     gdx::Options makeOptions() const;
+    gdx::GdExportOptions makeExportOptions() const;
     CCPoint placementOrigin() const;
 
     EditorUI* m_editor = nullptr;
@@ -64,7 +70,8 @@ protected:
     gdx::Result m_result;
     bool m_hasResult = false;
 
-    int m_method = 2;       // BSP por defecto
+    int m_method = 2;       // método normal (0..7); BSP por defecto
+    int m_mono = 0;         // 0 = ninguno (se usa el normal); 1..10 = estilo monocromo
     int m_budget = 10000;   // máximo permitido
     int m_sizeIdx = 3;
 
@@ -72,6 +79,8 @@ protected:
     CCLabelBMFont* m_descLabel = nullptr;
     CCLabelBMFont* m_budgetLabel = nullptr;
     CCLabelBMFont* m_sizeLabel = nullptr;
+    CCLabelBMFont* m_monoLabel = nullptr;
+    CCLabelBMFont* m_monoDescLabel = nullptr;
     CCLabelBMFont* m_statusLabel = nullptr;
     CCLabelBMFont* m_noteLabel = nullptr;
     CCNode* m_previewHolder = nullptr;

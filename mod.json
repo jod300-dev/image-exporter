@@ -8,9 +8,9 @@
 	},
 	"id": "patasma.image_exporter",
 	"name": "Image Exporter",
-	"version": "v1.0.0",
+	"version": "v1.1.0",
 	"developer": "Patasma",
-	"description": "Importa imagenes al editor con 8 metodos distintos y un maximo de 10.000 objetos.",
+	"description": "Importa imagenes al editor con 8 metodos y 9 estilos monocromos ligeros (max. 10.000 objetos).",
 	"resources": {
 		"spritesheets": {
 			"ExportBtn": [
@@ -27,7 +27,11 @@
 			"type": "string",
 			"default": "Normal",
 			"name": "Calidad de calculo",
-			"one-of": ["Rapido", "Normal", "Alto"],
+			"one-of": [
+				"Rapido",
+				"Normal",
+				"Alto"
+			],
 			"description": "Afecta a los metodos 7 y 8 (rectangulos rotados): <cy>Alto</c> prueba mas candidatos por objeto y tarda mas."
 		},
 		"max-raster": {
@@ -77,6 +81,48 @@
 			"default": true,
 			"name": "Seleccionar al colocar",
 			"description": "Selecciona los objetos importados para poder moverlos de golpe."
+		},
+		"title-mono": {
+			"name": "Estilos monocromos",
+			"type": "title"
+		},
+		"invert-ink": {
+			"type": "bool",
+			"default": false,
+			"name": "Tinta blanca sobre negro",
+			"description": "Invierte los estilos monocromos: tinta blanca sobre fondo negro (para fondos oscuros)."
+		},
+		"black-channel": {
+			"type": "int",
+			"default": 1010,
+			"min": 1,
+			"max": 1020,
+			"name": "Canal negro",
+			"description": "Canal de color usado para la tinta negra en los estilos monocromos (1010 = negro)."
+		},
+		"white-channel": {
+			"type": "int",
+			"default": 1011,
+			"min": 1,
+			"max": 1020,
+			"name": "Canal blanco",
+			"description": "Canal de color usado para el papel blanco en los estilos monocromos (1011 = blanco). Si el papel no sale blanco, cambia este valor."
+		},
+		"ascii-advance": {
+			"type": "float",
+			"default": 24.0,
+			"min": 1.0,
+			"max": 400.0,
+			"name": "ASCII: ancho de caracter",
+			"description": "Unidades que ocupa un caracter con escala 1 en la fuente del nivel. <cy>Calibralo</c> si las filas salen mas anchas o estrechas que la imagen."
+		},
+		"ascii-aspect": {
+			"type": "float",
+			"default": 1.0,
+			"min": 0.3,
+			"max": 3.0,
+			"name": "ASCII: alto/ancho de caracter",
+			"description": "Proporcion alto/ancho de una celda de texto. Con fuentes monoespaciadas suele estar entre 1.0 y 2.0."
 		}
 	},
 	"tags": [

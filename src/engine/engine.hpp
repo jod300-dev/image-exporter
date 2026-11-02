@@ -6,8 +6,12 @@
 #include "partition.hpp"
 #include "regions.hpp"
 #include "geometrize.hpp"
+#include "mono.hpp"
 
 namespace gdx {
+
+constexpr int kNormalMethodCount = 8;     // métodos "normales"; el resto son estilos monocromos
+inline bool isMonoMethod(Method m) { return int(m) >= kNormalMethodCount; }
 
 struct MethodInfo { const char* name; const char* desc; bool slow; };
 
@@ -29,6 +33,26 @@ inline const MethodInfo& methodInfo(Method m) {
          "Busqueda aleatoria de rectangulos girados que reducen el error (estilo Geometrize).", true},
         {"8. Hibrido BSP + rotados",
          "Base BSP y el resto del presupuesto en rectangulos rotados sobre los residuos. Maxima calidad.", true},
+        {"9. Halftone (diamantes)",
+         "Trama de periodico: cuadrados girados 45 grados cuyo tamano depende de la oscuridad. Sin HSV.", false},
+        {"10. Grabado de lineas",
+         "Lineas paralelas con grosor variable, como un grabado antiguo. Sin HSV, pocos objetos.", false},
+        {"11. Sombreado cruzado",
+         "Capas de rayas a 45, 135, 0 y 90 grados segun la oscuridad (cross-hatch). Sin HSV.", false},
+        {"12. Estarcido (puntos)",
+         "Nube de puntos mas densa donde la imagen es oscura (puntillismo). Sin HSV.", false},
+        {"13. Tramado Bayer",
+         "Blanco y negro con tramado ordenado, fusionado en rectangulos. Sin HSV.", false},
+        {"14. Tinta (comic)",
+         "Umbral adaptativo: manchas de tinta solidas, estilo comic. Muy pocos objetos. Sin HSV.", false},
+        {"15. Boceto de trazos",
+         "Trazos cortos orientados sobre los bordes, como un dibujo a lapiz. Sin HSV.", false},
+        {"16. Espiral",
+         "Una espiral cuyo grosor sigue la oscuridad de la imagen. Sin HSV.", false},
+        {"17. Diagonales 10 PRINT",
+         "Una diagonal / o \\ por celda segun la estructura local, grosor segun tono. Sin HSV.", false},
+        {"18. Arte ASCII (texto)",
+         "Una fila de texto por objeto: la imagen entera en ~100 objetos. Pide fuente monoespaciada.", false},
     };
     return kInfo[int(m)];
 }
@@ -96,14 +120,26 @@ inline Result convert(const Image& src, Method method, const Options& opt, Progr
             res.rasterW = w; res.rasterH = h; reference = std::move(target); haveRef = true;
             break;
         }
+        case Method::Halftone: case Method::Engrave: case Method::Hatch: case Method::Stipple:
+        case Method::Dither: case Method::Ink: case Method::Strokes: case Method::Spiral: case Method::Truchet:
+        case Method::Ascii: {
+            res.mono = true;
+            res.shapes = monoShapes(src, method, o, res, prog);
+            res.psnr = -1;                       // la fidelidad tonal no se mide en dB para tramas
+            break;
+        }
         default: break;
     }
     if (isCancelled(prog)) res.cancelled = true;
 
     // Garantía dura del presupuesto (no debería activarse).
-    if (int(res.shapes.size()) > o.budget) res.shapes.resize(size_t(o.budget));
+    if (int(res.shapes.size() + res.textRows.size()) > o.budget) {
+        size_t keep = size_t(std::max(0, o.budget));
+        if (res.textRows.size() > keep) res.textRows.resize(keep);
+        res.shapes.resize(std::min(res.shapes.size(), keep - res.textRows.size()));
+    }
 
-    if (haveRef) {
+    if (haveRef && !res.mono) {
         Image r = renderShapes(res.shapes, res.rasterW, res.rasterH);
         res.psnr = computePsnr(reference, r, o.alphaThreshold);
     }

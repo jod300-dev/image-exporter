@@ -12,10 +12,11 @@ namespace {
     constexpr int kMaxObjects = 10000;           // tope duro pedido: 10k objetos
     constexpr int kMinObjects = 500;
     constexpr int kBudgetStep = 500;
-    constexpr float kPopupW = 400.f, kPopupH = 290.f;
+    constexpr float kPopupW = 400.f, kPopupH = 380.f;
     constexpr float kPrevSize = 150.f;
     const int kSizes[] = {150, 300, 450, 600, 900, 1200, 1800, 2400, 3000, 4500, 6000};   // lado largo, unidades GD
     constexpr int kSizeCount = int(sizeof(kSizes) / sizeof(kSizes[0]));
+    constexpr int kMonoCount = int(gdx::Method::COUNT) - gdx::kNormalMethodCount;          // estilos monocromos
 
     int qualityFromSetting() {
         auto q = Mod::get()->getSettingValue<std::string>("quality");
@@ -46,7 +47,8 @@ bool ExportPopup::init(EditorUI* editor) {
 
     // ajustes recordados de la última vez
     auto* mod = Mod::get();
-    m_method = std::clamp(mod->getSavedValue<int>("method", 2), 0, int(gdx::Method::COUNT) - 1);
+    m_method = std::clamp(mod->getSavedValue<int>("method", 2), 0, gdx::kNormalMethodCount - 1);
+    m_mono = std::clamp(mod->getSavedValue<int>("mono", 0), 0, kMonoCount);
     m_budget = std::clamp(mod->getSavedValue<int>("budget", kMaxObjects), kMinObjects, kMaxObjects);
     m_sizeIdx = std::clamp(mod->getSavedValue<int>("size-idx", 3), 0, kSizeCount - 1);
 
@@ -58,7 +60,7 @@ bool ExportPopup::init(EditorUI* editor) {
         m_buttonMenu->addChildAtPosition(btn, Anchor::TopLeft, ccp(x, -y));
     };
 
-    // --- columna izquierda: método, descripción, objetos, tamaño ---
+    // --- sección normal, columna izquierda: método, descripción, objetos, tamaño ---
     const float cx = 115.f;
     addArrow(false, menu_selector(ExportPopup::onMethodPrev), 18.f, 50.f);
     addArrow(true,  menu_selector(ExportPopup::onMethodNext), 212.f, 50.f);
@@ -91,24 +93,40 @@ bool ExportPopup::init(EditorUI* editor) {
     m_previewHolder->addChild(hint);
     m_mainLayer->addChildAtPosition(m_previewHolder, Anchor::TopLeft, ccp(312.f, -118.f));
 
+    // --- sección de estilos monocromos, debajo de la normal ---
+    auto line = CCLayerColor::create(ccc4(255, 255, 255, 60), 360.f, 1.f);
+    m_mainLayer->addChildAtPosition(line, Anchor::TopLeft, ccp(20.f, -214.f));
+    auto head = CCLabelBMFont::create("Estilos monocromos (ligeros, sin HSV)", "bigFont.fnt");
+    head->setScale(0.4f);
+    head->setColor({255, 215, 90});
+    m_mainLayer->addChildAtPosition(head, Anchor::TopLeft, ccp(kPopupW / 2, -230.f));
+
+    addArrow(false, menu_selector(ExportPopup::onMonoPrev), 40.f, 258.f);
+    addArrow(true,  menu_selector(ExportPopup::onMonoNext), 360.f, 258.f);
+    m_monoLabel = CCLabelBMFont::create("", "bigFont.fnt");
+    m_mainLayer->addChildAtPosition(m_monoLabel, Anchor::TopLeft, ccp(kPopupW / 2, -258.f));
+    m_monoDescLabel = CCLabelBMFont::create("", "chatFont.fnt", 340.f, kCCTextAlignmentCenter);
+    m_monoDescLabel->setScale(0.8f);
+    m_mainLayer->addChildAtPosition(m_monoDescLabel, Anchor::TopLeft, ccp(kPopupW / 2, -284.f));
+
     // --- estado ---
     m_statusLabel = CCLabelBMFont::create("Elige una imagen para empezar", "chatFont.fnt");
-    m_mainLayer->addChildAtPosition(m_statusLabel, Anchor::TopLeft, ccp(kPopupW / 2, -218.f));
-    m_noteLabel = CCLabelBMFont::create("", "chatFont.fnt");
-    m_noteLabel->setScale(0.75f);
+    m_mainLayer->addChildAtPosition(m_statusLabel, Anchor::TopLeft, ccp(kPopupW / 2, -310.f));
+    m_noteLabel = CCLabelBMFont::create("", "chatFont.fnt", 380.f, kCCTextAlignmentCenter);
+    m_noteLabel->setScale(0.7f);
     m_noteLabel->setColor({255, 200, 80});
-    m_mainLayer->addChildAtPosition(m_noteLabel, Anchor::TopLeft, ccp(kPopupW / 2, -236.f));
+    m_mainLayer->addChildAtPosition(m_noteLabel, Anchor::TopLeft, ccp(kPopupW / 2, -328.f));
 
     // --- botones ---
     auto pickSpr = ButtonSprite::create("Elegir imagen");
     pickSpr->setScale(0.8f);
     auto pickBtn = CCMenuItemSpriteExtra::create(pickSpr, this, menu_selector(ExportPopup::onPick));
-    m_buttonMenu->addChildAtPosition(pickBtn, Anchor::TopLeft, ccp(115.f, -264.f));
+    m_buttonMenu->addChildAtPosition(pickBtn, Anchor::TopLeft, ccp(115.f, -356.f));
 
     auto placeSpr = ButtonSprite::create("Colocar");
     placeSpr->setScale(0.8f);
     auto placeBtn = CCMenuItemSpriteExtra::create(placeSpr, this, menu_selector(ExportPopup::onPlace));
-    m_buttonMenu->addChildAtPosition(placeBtn, Anchor::TopLeft, ccp(285.f, -264.f));
+    m_buttonMenu->addChildAtPosition(placeBtn, Anchor::TopLeft, ccp(285.f, -356.f));
 
     auto infoBtn = CCMenuItemSpriteExtra::create(
         CCSprite::createWithSpriteFrameName("GJ_infoIcon_001.png"), this, menu_selector(ExportPopup::onInfo));
@@ -121,11 +139,30 @@ bool ExportPopup::init(EditorUI* editor) {
 
 // ------------------------------------------------------------- etiquetas ---
 
+gdx::Method ExportPopup::effectiveMethod() const {
+    return m_mono > 0 ? gdx::Method(gdx::kNormalMethodCount + m_mono - 1) : gdx::Method(m_method);
+}
+
 void ExportPopup::refreshLabels() {
     auto const& info = gdx::methodInfo(gdx::Method(m_method));
     m_methodLabel->setString(info.name);
     m_methodLabel->limitLabelWidth(170.f, 0.5f, 0.2f);
     m_descLabel->setString(info.desc);
+
+    // si hay un estilo monocromo activo, sustituye al método normal (que se atenúa)
+    bool monoOn = m_mono > 0;
+    m_methodLabel->setOpacity(monoOn ? 100 : 255);
+    m_descLabel->setOpacity(monoOn ? 100 : 255);
+    if (monoOn) {
+        auto const& mi = gdx::methodInfo(gdx::Method(gdx::kNormalMethodCount + m_mono - 1));
+        m_monoLabel->setString(mi.name);
+        m_monoDescLabel->setString(mi.desc);
+    } else {
+        m_monoLabel->setString("(ninguno: usa el de arriba)");
+        m_monoDescLabel->setString("Elige un estilo para usar solo tinta negra/blanca por canal, sin HSV y con pocos objetos.");
+    }
+    m_monoLabel->setOpacity(monoOn ? 255 : 150);
+    m_monoLabel->limitLabelWidth(280.f, 0.5f, 0.2f);
 
     char buf[96];
     std::snprintf(buf, sizeof buf, "Objetos max: %d", m_budget);
@@ -138,20 +175,28 @@ void ExportPopup::refreshLabels() {
 
     auto* mod = Mod::get();
     mod->setSavedValue<int>("method", m_method);
+    mod->setSavedValue<int>("mono", m_mono);
     mod->setSavedValue<int>("budget", m_budget);
     mod->setSavedValue<int>("size-idx", m_sizeIdx);
 }
 
 void ExportPopup::setStatus(std::string const& s, std::string const& note) {
     m_statusLabel->setString(s.c_str());
-    m_statusLabel->limitLabelWidth(370.f, 0.8f, 0.3f);
+    m_statusLabel->limitLabelWidth(380.f, 0.8f, 0.3f);
     m_noteLabel->setString(note.c_str());
-    m_noteLabel->limitLabelWidth(370.f, 0.75f, 0.3f);
 }
 
 void ExportPopup::stepMethod(int dir) {
-    int n = int(gdx::Method::COUNT);
+    int n = gdx::kNormalMethodCount;
     m_method = (m_method + dir + n) % n;
+    m_mono = 0;                                   // elegir un método normal desactiva el estilo monocromo
+    this->refreshLabels();
+    this->scheduleRecompute();
+}
+
+void ExportPopup::stepMono(int dir) {
+    int n = kMonoCount + 1;                       // 0 = ninguno
+    m_mono = (m_mono + dir + n) % n;
     this->refreshLabels();
     this->scheduleRecompute();
 }
@@ -225,7 +270,23 @@ gdx::Options ExportPopup::makeOptions() const {
     o.maxRaster = std::clamp(mod->getSettingValue<int>("max-raster"), 128, 1024);
     o.alphaThreshold = std::clamp(mod->getSettingValue<int>("alpha-threshold"), 1, 255);
     o.quality = qualityFromSetting();
+    o.invertInk = mod->getSettingValue<bool>("invert-ink");
+    o.asciiAspect = float(std::clamp(mod->getSettingValue<double>("ascii-aspect"), 0.3, 3.0));
     return o;
+}
+
+gdx::GdExportOptions ExportPopup::makeExportOptions() const {
+    auto* mod = Mod::get();
+    gdx::GdExportOptions eo;
+    eo.longSide = kSizes[m_sizeIdx];
+    eo.colorChannel = std::clamp(mod->getSettingValue<int>("color-channel"), 1, 1020);
+    eo.bleed = std::clamp(mod->getSettingValue<double>("bleed"), 0.0, 2.0);
+    eo.flipRotation = mod->getSettingValue<bool>("flip-rotation");
+    eo.monoFastPath = m_result.mono;                                // negro/blanco por canal, sin claves de HSV
+    eo.blackChannel = std::clamp(mod->getSettingValue<int>("black-channel"), 1, 1020);
+    eo.whiteChannel = std::clamp(mod->getSettingValue<int>("white-channel"), 1, 1020);
+    eo.asciiAdvance = std::clamp(mod->getSettingValue<double>("ascii-advance"), 1.0, 400.0);
+    return eo;
 }
 
 void ExportPopup::scheduleRecompute() {
@@ -241,7 +302,7 @@ void ExportPopup::recompute(float) {
     auto job = std::make_shared<Job>();
     job->id = ++m_jobCounter;
     job->src = m_image;
-    job->method = gdx::Method(m_method);
+    job->method = effectiveMethod();
     job->opt = makeOptions();
     m_job = job;
     this->setStatus("Calculando... 0%");
@@ -272,14 +333,21 @@ void ExportPopup::tick(float) {
 
 void ExportPopup::applyResult(std::shared_ptr<Job> job) {
     m_result = std::move(job->result);
-    m_hasResult = !m_result.shapes.empty();
+    m_hasResult = !m_result.shapes.empty() || !m_result.textRows.empty();
     if (!m_hasResult) {
         this->setStatus("No se genero ningun objeto", m_result.note);
         return;
     }
-    char buf[160];
-    std::snprintf(buf, sizeof buf, "%zu objetos de %d  |  %.1f dB  |  %.1f s",
-                  m_result.shapes.size(), m_budget, m_result.psnr, m_result.ms / 1000.0);
+    // tamaño aproximado de la cadena de objetos (sin comprimir): sirve para comparar métodos
+    size_t kb = gdx::toGdString(m_result, makeExportOptions()).size() / 1024;
+    size_t objs = m_result.shapes.size() + m_result.textRows.size();
+    char buf[200];
+    if (m_result.psnr >= 0)
+        std::snprintf(buf, sizeof buf, "%zu objetos de %d  |  %.1f dB  |  ~%zu KB  |  %.1f s",
+                      objs, m_budget, m_result.psnr, kb, m_result.ms / 1000.0);
+    else
+        std::snprintf(buf, sizeof buf, "%zu objetos de %d  |  ~%zu KB  |  %.1f s",
+                      objs, m_budget, kb, m_result.ms / 1000.0);
     this->setStatus(buf, m_result.note);
     this->buildPreview();
 }
@@ -288,7 +356,14 @@ void ExportPopup::buildPreview() {
     if (m_preview) { m_preview->removeFromParent(); m_preview = nullptr; }
     int w = m_result.rasterW, h = m_result.rasterH;
     if (w <= 0 || h <= 0) return;
-    gdx::Image img = gdx::renderShapes(m_result.shapes, w, h);
+    gdx::Image img;
+    if (!m_result.previewImg.empty()) {
+        img = m_result.previewImg;                                  // ASCII: bloques de tinta
+    } else {
+        int k = m_result.mono ? std::clamp(300 / std::max(w, h), 1, 3) : 1;   // las líneas finas necesitan más resolución
+        img = gdx::renderShapesScaled(m_result.shapes, w, h, k);
+    }
+    w = img.w; h = img.h;
     std::vector<uint8_t> buf(size_t(w) * h * 4);
     for (size_t i = 0; i < size_t(w) * h; ++i) {                    // composita sobre gris oscuro
         const uint8_t* p = &img.rgba[i * 4];
@@ -346,21 +421,17 @@ void ExportPopup::onPlace(CCObject*) {
     if (!lel) return;
 
     auto* mod = Mod::get();
-    gdx::GdExportOptions eo;
+    gdx::GdExportOptions eo = makeExportOptions();
     CCPoint origin = placementOrigin();
     eo.originX = origin.x;
     eo.originY = origin.y;
-    eo.longSide = kSizes[m_sizeIdx];
-    eo.colorChannel = std::clamp(mod->getSettingValue<int>("color-channel"), 1, 1020);
-    eo.bleed = std::clamp(mod->getSettingValue<double>("bleed"), 0.0, 2.0);
-    eo.flipRotation = mod->getSettingValue<bool>("flip-rotation");
 
     std::string str = gdx::toGdString(m_result, eo);
     if (str.empty()) {
         FLAlertLayer::create("Image Exporter", "No hay objetos que colocar.", "OK")->show();
         return;
     }
-    size_t count = m_result.shapes.size();
+    size_t count = m_result.shapes.size() + m_result.textRows.size();
     CCArray* created = lel->createObjectsFromString(str.c_str(), true, true);
     if (created && created->count() > 0 && mod->getSettingValue<bool>("select-after") && m_editor) {
         m_editor->selectObjects(created, true);
@@ -379,6 +450,8 @@ void ExportPopup::onInfo(CCObject*) {
         "- <cg>3 BSP</c>: mejor para fotos.\n"
         "- <cg>5 Regiones</c>: ilustraciones y pixel art (muy pocos objetos).\n"
         "- <cg>8 Hibrido</c>: maxima calidad, tarda un poco mas.\n"
+        "<cy>Estilos monocromos</c> (seccion de abajo): tinta negra/blanca por canal, <cg>sin HSV</c> y pocos objetos. "
+        "El <cg>ASCII</c> usa objetos de texto: elige una fuente monoespaciada en el nivel y calibra el ancho de caracter en los ajustes.\n"
         "Con <cy>un objeto seleccionado</c> la imagen se centra en el; si no, en el centro de la vista.\n"
         "La importacion no se puede deshacer: <cr>guarda antes</c>. Quedan seleccionados para moverlos.",
         "OK"

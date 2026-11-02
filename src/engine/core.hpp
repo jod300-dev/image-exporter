@@ -43,6 +43,17 @@ enum class Method : int {
     Runs,             // 6. Franjas horizontales con tolerancia
     Geometrize,       // 7. Rectángulos rotados por búsqueda aleatoria
     Hybrid,           // 8. Híbrido: BSP + refinado con rectángulos rotados
+    // ---- estilos monocromos (sin HSV, pocos objetos) ----
+    Halftone,         // 9.  Trama de diamantes (halftone)
+    Engrave,          // 10. Grabado de líneas de grosor variable
+    Hatch,            // 11. Sombreado cruzado (cross-hatch)
+    Stipple,          // 12. Estarcido / puntillismo
+    Dither,           // 13. Tramado Bayer + rectángulos fusionados
+    Ink,              // 14. Tinta (umbral adaptativo)
+    Strokes,          // 15. Boceto de trazos sobre los bordes
+    Spiral,           // 16. Espiral de grosor variable
+    Truchet,          // 17. Diagonales tipo "10 PRINT"
+    Ascii,            // 18. Arte ASCII con objetos de texto (1 objeto por fila)
     COUNT
 };
 
@@ -52,6 +63,14 @@ struct Options {
     int alphaThreshold = 128;            // alfa >= umbral => píxel opaco
     int quality = 1;                     // 0 rápido, 1 normal, 2 alto
     uint32_t seed = 1337;
+    bool invertInk = false;              // estilos monocromos: tinta blanca sobre fondo negro
+    float asciiAspect = 1.0f;            // ASCII: alto/ancho de una celda de carácter (según la fuente)
+};
+
+// Una fila de arte ASCII: se exporta como UN objeto de texto de GD.
+struct TextRow {
+    float cx = 0, cy = 0;                // centro de la fila (unidades del raster = celdas)
+    std::string text;
 };
 
 struct Progress {
@@ -67,6 +86,10 @@ struct Result {
     double ms = 0;                       // tiempo de cálculo
     bool cancelled = false;
     bool hadAlpha = false;
+    bool mono = false;                   // solo tinta/papel (negro y blanco), sin HSV
+    uint8_t inkValue = 0;                // 0 = tinta negra, 255 = tinta blanca
+    std::vector<TextRow> textRows;       // arte ASCII (objetos de texto)
+    Image previewImg;                    // vista previa propia (ASCII); vacía = renderizar `shapes`
     std::string note;                    // info extra para mostrar al usuario
 };
 
@@ -259,6 +282,14 @@ inline Image renderShapes(const std::vector<Shape>& shapes, int W, int H) {
             }
     }
     return c;
+}
+
+// Igual que renderShapes pero a k veces la resolución (para ver líneas finas).
+inline Image renderShapesScaled(const std::vector<Shape>& shapes, int W, int H, int k) {
+    if (k <= 1) return renderShapes(shapes, W, H);
+    std::vector<Shape> sc = shapes;
+    for (auto& s : sc) { s.cx *= k; s.cy *= k; s.w *= k; s.h *= k; }
+    return renderShapes(sc, W * k, H * k);
 }
 
 // PSNR (dB) entre el objetivo y el render. Píxeles presentes en sólo uno de los

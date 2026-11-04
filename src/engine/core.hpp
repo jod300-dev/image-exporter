@@ -66,8 +66,17 @@ struct Options {
     uint32_t seed = 1337;
     bool invertInk = false;              // estilos monocromos: tinta blanca sobre fondo negro
     float asciiAspect = 1.0f;            // ASCII: alto/ancho de una celda de carácter (según la fuente)
-    bool colorChannels = false;          // estilos ligeros: colores de la imagen en canales (sin HSV)
-    int paletteSize = 12;                // nº máximo de colores/canales cuando colorChannels está activo
+    // ---- estilos ligeros (9-18) ----
+    bool colorChannels = false;          // true: colores de la imagen (base de color + tinta del mismo tono) en canales
+    int paletteSize = 48;                // canales de color del estilo ligero (se reparten en pares base/tinta)
+    bool lightSpecialChannels = false;   // blanco y negro: usar los canales especiales 1010/1011 en vez de canales libres
+    int asciiChunk = 60;                 // caracteres máximos por objeto de texto (las filas largas se parten)
+    // ---- métodos principales (1-8) ----
+    bool mainChannels = false;           // colores en canales (sin HSV)
+    bool grayscale = false;              // escala de grises (con HSV o con canales según mainChannels)
+    int mainPaletteSize = 64;            // canales de la paleta de los métodos principales
+    // ---- canales disponibles ----
+    int maxChannels = 997;               // canales libres que puede usar este resultado (el 1 nunca; lo fija la ventana)
 };
 
 // Una fila de arte ASCII: se exporta como UN objeto de texto de GD.
@@ -93,7 +102,7 @@ struct Result {
     bool hadAlpha = false;
     bool mono = false;                   // solo tinta/papel (negro y blanco), sin HSV
     uint8_t inkValue = 0;                // 0 = tinta negra, 255 = tinta blanca
-    bool colored = false;                // la tinta usa colores de paleta (cada color = un canal, sin HSV)
+    bool colored = false;                // el resultado usa canales de color (cada color distinto = un canal, sin HSV)
     std::vector<TextRow> textRows;       // arte ASCII (objetos de texto)
     std::vector<std::array<uint8_t, 3>> palette;   // colores de los canales (índice = Shape::pal)
     Image previewImg;                    // vista previa propia (ASCII); vacía = renderizar `shapes`

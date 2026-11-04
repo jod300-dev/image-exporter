@@ -57,17 +57,25 @@ inline const MethodInfo& methodInfo(Method m) {
     return kInfo[int(m)];
 }
 
-// Convierte la imagen a formas con el método indicado. Garantiza shapes.size() <= opt.budget.
-inline Result convert(const Image& src, Method method, const Options& opt, Progress* prog = nullptr) {
+// Convierte la imagen a formas con el método indicado. Garantiza shapes.size() + textRows.size() <= opt.budget.
+inline Result convert(const Image& srcIn, Method method, const Options& opt, Progress* prog = nullptr) {
     Result res;
     double t0 = nowMs();
     Options o = opt;
     o.budget = std::clamp(o.budget, 1, 80000);
     o.maxRaster = std::clamp(o.maxRaster, 32, 2048);
-    res.aspect = src.h > 0 ? float(src.w) / float(src.h) : 1.f;
-    if (src.empty()) return res;
-    res.hadAlpha = hasTransparency(src, o.alphaThreshold);
+    o.maxChannels = std::clamp(o.maxChannels, 0, 997);
+    res.aspect = srcIn.h > 0 ? float(srcIn.w) / float(srcIn.h) : 1.f;
+    if (srcIn.empty()) return res;
+    res.hadAlpha = hasTransparency(srcIn, o.alphaThreshold);
     report(prog, 0.f);
+
+    const bool light = isMonoMethod(method);
+    // Métodos principales en escala de grises: se trabaja con la imagen en grises desde el principio.
+    Image grayStore;
+    const Image* sp = &srcIn;
+    if (!light && o.grayscale) { grayStore = toGrayscale(srcIn); sp = &grayStore; }
+    const Image& src = *sp;
 
     auto treeRaster = [&](Image& ras) {
         int w, h; fitSize(src.w, src.h, o.maxRaster, w, h);
@@ -124,13 +132,41 @@ inline Result convert(const Image& src, Method method, const Options& opt, Progr
         case Method::Dither: case Method::Ink: case Method::Strokes: case Method::Spiral: case Method::Truchet:
         case Method::Ascii: {
             res.mono = true;
-            res.shapes = monoShapes(src, method, o, res, prog);
+            const bool shapesStyle = method != Method::Ascii;
+            Options os = o;
+            if (o.colorChannels && shapesStyle) os.budget = std::max(50, int(o.budget * 0.65));   // 35 % queda para la base de color
+            res.shapes = monoShapes(src, method, os, res, prog);
+            if (shapesStyle) {
+                if (o.colorChannels && !isCancelled(prog)) {
+                    int baseBudget = std::min(o.budget - int(res.shapes.size()), int(o.budget * 0.4));
+                    colorizeLightShapes(res, src, o, std::max(20, baseBudget));
+                } else {
+                    res.colored = !o.lightSpecialChannels;       // blanco y negro: 2 canales libres (o los especiales 1010/1011)
+                }
+            }
+            if (res.colored && !o.colorChannels && o.maxChannels < 2) {       // sin canales libres: especiales 1010/1011
+                res.colored = false;
+                for (auto& t : res.textRows) t.colored = false;
+                res.note = "No hay canales libres: se usan los especiales 1010/1011.";
+            }
             res.psnr = -1;                       // la fidelidad tonal no se mide en dB para tramas
             break;
         }
         default: break;
     }
     if (isCancelled(prog)) res.cancelled = true;
+
+    // Métodos principales con canales de color (sin HSV): paleta de K colores, cada uno = un canal.
+    if (!light && o.mainChannels && o.maxChannels >= 2 && !res.shapes.empty()) {
+        int K = o.grayscale ? std::min(o.mainPaletteSize, 32) : o.mainPaletteSize;
+        K = std::clamp(K, 2, std::max(2, o.maxChannels));
+        quantizeShapesToPalette(res.shapes, K);
+        res.colored = true;
+        if (method == Method::Regions || method == Method::Runs) {         // su PSNR se calculó antes de la paleta
+            int rw, rh; fitSize(src.w, src.h, 512, rw, rh);
+            res.psnr = psnrScaled(resizeArea(src, rw, rh), res.shapes, res.rasterW, res.rasterH, o.alphaThreshold);
+        }
+    }
 
     // Garantía dura del presupuesto (no debería activarse).
     if (int(res.shapes.size() + res.textRows.size()) > o.budget) {

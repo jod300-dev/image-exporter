@@ -2,6 +2,7 @@
 #include <Geode/Geode.hpp>
 #include <atomic>
 #include <memory>
+#include <set>
 #include <string>
 
 #include "engine.hpp"
@@ -44,12 +45,16 @@ protected:
     void onSizeInc(CCObject*) { stepSize(+1); }
     void onMonoPrev(CCObject*) { stepMono(-1); }
     void onMonoNext(CCObject*) { stepMono(+1); }
-    void onColorToggle(CCObject*);
+    void onColorToggle(CCObject*);          // check de los estilos ligeros: colores en canales
+    void onMainChannels(CCObject*) { setMainMode(m_mainMode == 1 ? 0 : 1); }
+    void onMainGrayHsv(CCObject*) { setMainMode(m_mainMode == 2 ? 0 : 2); }
+    void onMainGrayCh(CCObject*) { setMainMode(m_mainMode == 3 ? 0 : 3); }
 
     void stepMethod(int dir);
     void stepMono(int dir);
     void stepBudget(int dir);
     void stepSize(int dir);
+    void setMainMode(int mode);                // 0 HSV color (por defecto), 1 canales de color, 2 gris HSV, 3 gris canales
     gdx::Method effectiveMethod() const;       // el estilo monocromo, si hay uno activo; si no, el normal
     void refreshLabels();
 
@@ -63,7 +68,8 @@ protected:
     gdx::Options makeOptions() const;
     gdx::GdExportOptions makeExportOptions() const;
     CCPoint placementOrigin() const;
-    void applyChannelColorsDirect(gdx::GdExportOptions const& eo);   // define los canales en los ajustes de color del nivel
+    std::set<int> usedChannels() const;                              // canales que el nivel ya usa (objetos o colores definidos)
+    void applyChannelColorsDirect(gdx::GdExportOptions const& eo, gdx::ChannelMap const& cmap);   // define los canales en el selector de color del nivel
     bool colorModeOn() const { return m_colorCheck && m_mono > 0; }
 
     EditorUI* m_editor = nullptr;
@@ -76,6 +82,7 @@ protected:
     int m_method = 2;       // método normal (0..7); BSP por defecto
     int m_mono = 0;         // 0 = ninguno (se usa el normal); 1..10 = estilo monocromo
     bool m_colorCheck = false;   // estilos ligeros: colores de la imagen en canales de color (sin HSV)
+    int m_mainMode = 0;          // métodos 1-8: 0 HSV color, 1 canales de color, 2 gris HSV, 3 gris canales
     int m_budget = 10000;   // máximo permitido
     int m_sizeIdx = 3;
 
@@ -87,6 +94,9 @@ protected:
     CCLabelBMFont* m_monoDescLabel = nullptr;
     CCLabelBMFont* m_colorLabel = nullptr;
     CCMenuItemToggler* m_colorToggle = nullptr;
+    CCMenuItemToggler* m_chkChannels = nullptr;
+    CCMenuItemToggler* m_chkGrayHsv = nullptr;
+    CCMenuItemToggler* m_chkGrayCh = nullptr;
     CCLabelBMFont* m_statusLabel = nullptr;
     CCLabelBMFont* m_noteLabel = nullptr;
     CCNode* m_previewHolder = nullptr;

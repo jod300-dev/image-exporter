@@ -59,20 +59,32 @@ Pensados para ser **ligeros**: tinta negra (canal 1010) sobre papel blanco (cana
 Cada estilo tiene una separacion minima visible, asi que **con 10.000 de limite suelen usar bastantes menos** (sombreado cruzado ~2.000, grabado ~4.600-6.500, ASCII ~150).
 Ajustes utiles: *Tinta blanca sobre fondo negro*, *Canal negro/blanco*, *ASCII: ancho de caracter* y *ASCII: alto/ancho de caracter*.
 
-### Colores en canales (check de la seccion monocroma)
-Con el check **"Colores en canales (sin HSV)"** los estilos 9-18 usan los **colores de la imagen** sin HSV:
-* Los colores se reducen a una paleta (por defecto 12; ajustes: *Colores de la paleta*). El papel es el color 0 y la tinta usa el resto.
-* Cada color es un **canal de color propio, desde el 2** (ajuste *Primer canal de la paleta*; **el canal 1 nunca se usa**) y cada objeto solo lleva `21,<canal>`: ninguna clave de HSV.
-* Los canales se crean de dos formas (ajuste *Como crear los canales*): **Directo** (escribe el color en los ajustes de color del nivel, visible en el editor) y **Triggers** (un trigger de color por canal a la izquierda del inicio, x = -90, que se aplica al jugar). Por defecto, ambos.
-* El ASCII en color parte cada fila en tramos del mismo color (un objeto de texto por tramo, ~300 objetos).
-* Los triggers cuentan como objetos: se reservan del limite para no pasar de 10.000.
-* **Sin verificar en GD:** el modo *Directo* usa `GJEffectManager::getColorAction` y los campos de `ColorAction` (segun los bindings 2.2081), y los triggers usan el objeto 899 con claves 7/8/9/10/23/35. Si algo falla con *Directo*, usa *Solo triggers*.
+### Canales de color, grises y "Estilos ligeros" en color
+
+**Nada de triggers.** Los colores se escriben directamente en los ajustes de color del nivel (lo que lee el selector *Base Color* del editor) y cada objeto solo lleva su canal (`21,<canal>`): sin HSV y sin objetos extra.
+
+**Canales libres.** Antes de colocar, el mod mira que canales usa el nivel (el color base y de detalle de **todos los objetos** y los colores ya definidos) y reparte los colores de la imagen **solo en canales libres**, empezando en *Primer canal de la paleta* (por defecto 2). **El canal 1 nunca se usa.** Al colocar una segunda imagen coge otros canales distintos, asi que **no sobrescribe** los colores de la anterior. Si no quedan suficientes, avisa y no coloca nada.
+
+**Metodos 1-8: tres checks** (ninguno marcado = HSV a color, como siempre):
+* *Canales de color*: los colores se reducen a una paleta (por defecto 64, ajustable) y cada color es un canal.
+* *Gris (HSV)*: la imagen en escala de grises usando HSV.
+* *Gris (canales)*: lo mismo, pero con canales (hasta 32 tonos de gris).
+
+**Estilos ligeros (9-18):**
+* Por defecto son blanco y negro en **2 canales libres** (negro y blanco). Con el ajuste *Blanco y negro con canales 1010/1011* usan los canales especiales.
+* Con el check *Colores en canales (sin HSV)* salen **a color y mas limpios**: debajo va un **mosaico de color** (BSP) con el tono de la imagen, y encima el estilo con una version mas oscura del mismo tono. Asi no hay huecos transparentes ni puntos blancos/negros sueltos. La base compensa la cobertura real de tinta de cada zona, y los trazos largos se parten donde cambia el color.
+* La mitad de los canales de la paleta (*Estilos ligeros: canales en color*, por defecto 48) son para la base y la otra mitad para la tinta.
+
+**El z-order se exporta siempre** (clave 25) y los estilos ligeros ponen la base/papel en una capa inferior a la tinta (clave 24). Si falta la clave 25, GD usa el z por defecto del objeto 3092 y el papel puede quedar encima: eso causaba las imagenes en blanco.
+
+* **Sin verificar en GD:** definir los colores usa `GJEffectManager::getColorAction`, `getAllColorActions` y los campos de `ColorAction` (segun los bindings 2.2081); la deteccion de canales usa `GameObject::m_baseColor/m_detailColor`.
 
 ### Sobre el ASCII (leer)
 * El objeto de texto es el **914**, con el texto en base64 en la clave **31** (formato tomado de librerias de la comunidad, no probado aqui en GD).
-* **La fuente es un ajuste del nivel entero**, no del objeto: elige una monoespaciada (p. ej. la fuente 5, Joystix) en los ajustes del nivel.
-* Hay que **calibrar dos numeros** segun la fuente: *ancho de caracter* (unidades que ocupa un caracter con escala 1; por defecto 24, es una estimacion) y *alto/ancho* (por defecto 1.0; si la imagen sale estirada, cambialo). Pon una fila de prueba, mide y ajusta.
-* Cada fila es un objeto, asi que no depende de que el texto admita saltos de linea.
+* **Las filas se parten en objetos de texto** de *ASCII: caracteres por objeto* (60 por defecto; 14 o menos en color) colocados uno junto a otro, para que GD no recorte ni entrecorte las filas largas. Hay hasta 400 columnas (260 en color).
+* En color, cada tramo de texto usa el tono de su zona (canal propio) sobre un mosaico de color.
+* **La fuente es un ajuste del nivel entero**, no del objeto: elige una monoespaciada (p. ej. la fuente 5, Joystix).
+* Hay que **calibrar** segun la fuente: *ancho de caracter* (unidades con escala 1; por defecto 24, estimacion), *alto/ancho* (por defecto 1.0) y, si hace falta, *espaciado de letras* (clave 488). Pon una fila de prueba, mide y ajusta; los trozos se colocan con ese ancho, asi que un ancho mal calibrado deja huecos o solapes entre trozos.
 
 ### Sobre los borrados automaticos de RobTop
 No he encontrado informacion publica sobre la regla exacta, asi que **no hay garantia** de que un nivel no se borre. Lo que si hace el mod es atacar lo que se sabe que pesa: menos objetos, sin HSV por objeto y un indicador (`~KB`) del tamano de la cadena para comparar metodos. Si vas a subir un nivel, prueba antes con uno pequeno.
@@ -80,7 +92,7 @@ No he encontrado informacion publica sobre la regla exacta, asi que **no hay gar
 ## Estructura
 
 ```
-src/engine/   motor de conversion SIN dependencias de Geode (core, partition, regions, geometrize, mono, gdexport)
+src/engine/   motor de conversion SIN dependencias de Geode (core, partition, regions, geometrize, mono, palette, lightcolor, gdexport)
 src/ui/       ventana (Popup): metodo, objetos, tamano, vista previa, colocar
 src/main.cpp  boton en la pestana Edit (hook de EditorUI::createMoveMenu)
 tests/        engine_test.cpp: prueba autonoma del motor

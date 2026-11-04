@@ -1,6 +1,12 @@
 // Prueba autónoma del motor (sin Geode):
 //   g++ -O2 -std=c++20 -Iinclude -Isrc/engine tests/engine_test.cpp -o engine_test
-//   ./engine_test imagen.png [presupuesto] [carpeta_salida] [metodo|all]
+//   ./engine_test imagen.png [presupuesto] [carpeta_salida] [metodo(0-17)|all]
+// Variables de entorno:
+//   GDX_MAINMODE=0..3   métodos 1-8: 0 HSV color, 1 canales de color, 2 gris HSV, 3 gris canales
+//   GDX_LIGHTCOLOR=1    estilos 9-18 en color (base de color + tinta del mismo tono, canales)
+//   GDX_PALETTE=N       canales de la paleta de los estilos ligeros   GDX_MAINPAL=N  la de los métodos principales
+//   GDX_SPECIAL=1       estilos ligeros en blanco y negro con los canales especiales 1010/1011
+//   GDX_CHUNK=N         caracteres máximos por objeto de texto        GDX_ASPECT=x   alto/ancho de carácter
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -8,12 +14,10 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <set>
 #include <sstream>
-#include <map>
-#include <array>
 #include "engine.hpp"
 #include "gdexport.hpp"
-#include "mono.hpp"
 
 using namespace gdx;
 
@@ -39,7 +43,6 @@ static void savePreview(const char* path, const Image& render, bool checker) {
     stbi_write_png(path, render.w, render.h, 3, out.data(), render.w * 3);
 }
 
-// --- Parseo inverso de la cadena de GD para validar el exportador -----------
 static void hsvToRgb(double h, double s, double v, uint8_t& R, uint8_t& G, uint8_t& B) {
     if (h < 0) h += 360;
     double c = v * s, hp = h / 60.0, x = c * (1 - std::abs(std::fmod(hp, 2.0) - 1)), r = 0, g = 0, b = 0;
@@ -56,49 +59,48 @@ static std::string b64dec(const std::string& in) {
     return out;
 }
 
-static std::vector<Shape> parseGd(const std::string& str, const Result& r, const GdExportOptions& o, int& objCount, bool& formatOk, const std::map<int, std::array<uint8_t, 3>>* chanColors = nullptr) {
-    std::vector<Shape> out; objCount = 0; formatOk = true; int textCount = 0;
+struct ParsedObj { int id = 0, ch = 0, layer = -999, z = -999; bool hasHsv = false, hasZ = false, hasLayer = false; std::string b64; };
+
+// Reinterpreta la cadena de GD: devuelve las formas reconstruidas y datos de cada objeto para validarlos.
+static std::vector<Shape> parseGd(const std::string& str, const Result& r, const GdExportOptions& o,
+                                  const std::map<int, std::array<uint8_t, 3>>& chanColors, std::vector<ParsedObj>& objs, bool& formatOk) {
+    std::vector<Shape> out; formatOk = true;
     GdSize sz = gdImageSize(r, o);
     double ux = sz.w / r.rasterW, uy = sz.h / r.rasterH;
     std::stringstream ss(str);
     std::string obj;
     while (std::getline(ss, obj, ';')) {
         if (obj.empty()) continue;
-        ++objCount;
         std::vector<std::string> tok; std::stringstream os(obj); std::string t;
         while (std::getline(os, t, ',')) tok.push_back(t);
         if (tok.size() % 2) { formatOk = false; continue; }
-        double x = 0, y = 0, sx = 1, sy = 1, rot = 0; int z = 0; std::string hsv, b64; int id = 0, ch = 0;
+        double x = 0, y = 0, sx = 1, sy = 1, rot = 0; std::string hsv; ParsedObj po;
         for (size_t i = 0; i + 1 < tok.size(); i += 2) {
             int k = std::atoi(tok[i].c_str()); const std::string& v = tok[i + 1];
-            if (k == 1) id = std::atoi(v.c_str()); else if (k == 2) x = std::atof(v.c_str()); else if (k == 3) y = std::atof(v.c_str());
+            if (k == 1) po.id = std::atoi(v.c_str()); else if (k == 2) x = std::atof(v.c_str()); else if (k == 3) y = std::atof(v.c_str());
             else if (k == 128) sx = std::atof(v.c_str()); else if (k == 129) sy = std::atof(v.c_str());
-            else if (k == 6) rot = std::atof(v.c_str()); else if (k == 25) z = std::atoi(v.c_str());
-            else if (k == 43) hsv = v; else if (k == 21) ch = std::atoi(v.c_str()); else if (k == 31) b64 = v;
+            else if (k == 6) rot = std::atof(v.c_str());
+            else if (k == 25) { po.z = std::atoi(v.c_str()); po.hasZ = true; }
+            else if (k == 24) { po.layer = std::atoi(v.c_str()); po.hasLayer = true; }
+            else if (k == 43) { hsv = v; po.hasHsv = true; } else if (k == 41) po.hasHsv = true;
+            else if (k == 21) po.ch = std::atoi(v.c_str()); else if (k == 31) po.b64 = v;
         }
-        if (id == 914) {                                       // objeto de texto (ASCII)
-            ++textCount; if (textCount > (int)r.textRows.size() || b64dec(b64) != r.textRows[textCount - 1].text) formatOk = false;
-            continue;
-        }
-        if (id != o.objectId) formatOk = false;
-        if (!o.monoFastPath && !chanColors && ch != o.colorChannel) formatOk = false;
+        objs.push_back(po);
+        if (po.id == 914) continue;                              // texto: se valida aparte
         Shape sh;
-        if (hsv.empty()) {                                   // modo monocromo: solo canal, sin HSV
-            if (chanColors && chanColors->count(ch)) {         // canal de paleta definido por un trigger
-                auto const& c3 = chanColors->at(ch); sh.r = c3[0]; sh.g = c3[1]; sh.b = c3[2];
-                if (ch < 2) formatOk = false;
-            } else {
-                if (!o.monoFastPath || (ch != o.blackChannel && ch != o.whiteChannel)) { formatOk = false; continue; }
-                uint8_t cv = ch == o.blackChannel ? 0 : 255; sh.r = sh.g = sh.b = cv;
-            }
-        } else {
-            double h, s, v; std::stringstream hs(hsv); std::string a; std::vector<double> n;
+        if (!hsv.empty()) {
+            std::stringstream hs(hsv); std::string a; std::vector<double> n;
             while (std::getline(hs, a, 'a')) n.push_back(std::atof(a.c_str()));
             if (n.size() != 5) { formatOk = false; continue; }
-            h = n[0]; s = n[1]; v = n[2]; hsvToRgb(h, s, v, sh.r, sh.g, sh.b);
-        } sh.cx = float((x - o.originX) / ux + r.rasterW * 0.5); sh.cy = float((o.originY - y) / uy + r.rasterH * 0.5);
+            hsvToRgb(n[0], n[1], n[2], sh.r, sh.g, sh.b);
+        } else if (chanColors.count(po.ch)) {
+            auto c = chanColors.at(po.ch); sh.r = c[0]; sh.g = c[1]; sh.b = c[2];
+        } else if (po.ch == o.blackChannel) { sh.r = sh.g = sh.b = 0; }
+        else if (po.ch == o.whiteChannel) { sh.r = sh.g = sh.b = 255; }
+        else { formatOk = false; continue; }
+        sh.cx = float((x - o.originX) / ux + r.rasterW * 0.5); sh.cy = float((o.originY - y) / uy + r.rasterH * 0.5);
         bool rotated = std::abs(rot) > 0.001; double bl = rotated ? 0 : o.bleed;
-        sh.w = float((sx - bl) / ux); sh.h = float((sy - bl) / uy); sh.rot = float(o.flipRotation ? -rot : rot); sh.z = int16_t(z - o.zBase);
+        sh.w = float((sx - bl) / ux); sh.h = float((sy - bl) / uy); sh.rot = float(o.flipRotation ? -rot : rot); sh.z = int16_t(po.z - o.zBase);
         out.push_back(sh);
     }
     return out;
@@ -111,86 +113,129 @@ int main(int argc, char** argv) {
     int budget = argc > 2 ? std::atoi(argv[2]) : 10000;
     std::string outDir = argc > 3 ? argv[3] : ".";
     int only = (argc > 4 && std::strcmp(argv[4], "all") != 0) ? std::atoi(argv[4]) : -1;
+
     Options opt; opt.budget = budget;
     if (const char* q = std::getenv("GDX_QUALITY")) opt.quality = std::atoi(q);
     if (const char* a = std::getenv("GDX_ASPECT")) opt.asciiAspect = float(std::atof(a));
-    if (const char* c = std::getenv("GDX_COLOR")) opt.colorChannels = std::atoi(c) != 0;
+    int mainMode = 0; if (const char* m = std::getenv("GDX_MAINMODE")) mainMode = std::atoi(m);
+    opt.mainChannels = mainMode == 1 || mainMode == 3; opt.grayscale = mainMode >= 2;
+    if (const char* c = std::getenv("GDX_LIGHTCOLOR")) opt.colorChannels = std::atoi(c) != 0;
     if (const char* k = std::getenv("GDX_PALETTE")) opt.paletteSize = std::atoi(k);
+    if (const char* k = std::getenv("GDX_MAINPAL")) opt.mainPaletteSize = std::atoi(k);
+    if (const char* k = std::getenv("GDX_CHUNK")) opt.asciiChunk = std::atoi(k);
+    if (const char* k = std::getenv("GDX_SPECIAL")) opt.lightSpecialChannels = std::atoi(k) != 0;
 
-    std::printf("Imagen %dx%d  presupuesto=%d  alfa=%s\n", src.w, src.h, budget, hasTransparency(src, 128) ? "si" : "no");
-    std::printf("%-28s %8s %8s %9s %8s %s\n", "metodo", "objetos", "PSNR dB", "tiempo ms", "raster", "validacion GD");
+    // Canales que "ya usa el nivel": 2..9 y los múltiplos de 7. La paleta debe esquivarlos.
+    std::set<int> used; for (int c = 2; c <= 9; ++c) used.insert(c); for (int c = 7; c <= 999; c += 7) used.insert(c);
+    opt.maxChannels = countFreeChannels(used);
+
+    std::printf("Imagen %dx%d  presupuesto=%d  alfa=%s  modo-principal=%d  ligero-color=%d  canales-libres=%d\n", src.w, src.h, budget,
+                hasTransparency(src, 128) ? "si" : "no", mainMode, int(opt.colorChannels), opt.maxChannels);
+    std::printf("%-26s %7s %8s %7s %6s %4s  %s\n", "metodo", "objetos", "PSNR dB", "ms", "KB", "can", "validacion");
     int fails = 0;
     for (int m = 0; m < int(Method::COUNT); ++m) {
         if (only >= 0 && m != only) continue;
         Result r = convert(src, Method(m), opt, nullptr);
-        bool okCount = int(r.shapes.size() + r.textRows.size()) <= budget;
+        std::string why;
+        size_t nObj = r.shapes.size() + r.textRows.size();
+        if (int(nObj) > budget) why += "SUPERA-PRESUPUESTO ";
+        if (nObj == 0) why += "VACIO ";
 
-        GdExportOptions eo; eo.monoFastPath = r.mono; eo.originX = 1234.5; eo.originY = -321.25; eo.longSide = 600; eo.zBase = 0;
-        std::string gd = toGdString(r, eo);
-        std::string trig = toGdColorTriggers(r, eo);
-        // canal -> color según los triggers (solo en modo color)
-        std::map<int, std::array<uint8_t, 3>> chanColors; bool trigOk = true; int trigCount = 0;
+        // canales libres para este resultado
+        ChannelMap cmap = buildChannelMap(r);
+        GdExportOptions eo; eo.originX = 1234.5; eo.originY = -321.25; eo.longSide = 600;
+        eo.monoFastPath = r.mono && !r.colored;
+        eo.asciiKerning = 0;
+        std::map<int, std::array<uint8_t, 3>> chanColors;
         if (r.colored) {
-            std::stringstream ts(trig); std::string ob;
-            while (std::getline(ts, ob, ';')) {
-                if (ob.empty()) continue; ++trigCount;
-                std::vector<std::string> tk; std::stringstream os2(ob); std::string t2;
-                while (std::getline(os2, t2, ',')) tk.push_back(t2);
-                int id = 0, tch = 0, R = -1, G = -1, B = -1;
-                for (size_t i = 0; i + 1 < tk.size(); i += 2) {
-                    int k = std::atoi(tk[i].c_str()), v = std::atoi(tk[i + 1].c_str());
-                    if (k == 1) id = v; else if (k == 7) R = v; else if (k == 8) G = v; else if (k == 9) B = v; else if (k == 23) tch = v;
-                }
-                if (id != 899 || R < 0 || G < 0 || B < 0 || tch < 2 || tch > 999 || chanColors.count(tch)) trigOk = false;
-                chanColors[tch] = {uint8_t(R), uint8_t(G), uint8_t(B)};
+            eo.channels = pickFreeChannels(used, 2, int(cmap.colors.size()));
+            if (eo.channels.size() != cmap.colors.size()) why += "FALTAN-CANALES ";
+            for (size_t i = 0; i < eo.channels.size(); ++i) {
+                chanColors[eo.channels[i]] = cmap.colors[i];
+                if (eo.channels[i] == 1 || used.count(eo.channels[i]) || eo.channels[i] > 999) why += "CANAL-INVALIDO ";
             }
-            if (trigCount > opt.paletteSize || trigCount == 0) trigOk = false;
+            if (int(cmap.colors.size()) > opt.maxChannels) why += "MAS-COLORES-QUE-CANALES ";
         }
-        int cnt; bool fmtOk;
-        auto back = parseGd(gd, r, eo, cnt, fmtOk, r.colored ? &chanColors : nullptr);
-        if (r.mono && gd.find(",43,") != std::string::npos) fmtOk = false;       // los estilos ligeros NUNCA llevan HSV
-        if (!trigOk) fmtOk = false;
-        Image a = renderShapes(r.shapes, r.rasterW, r.rasterH), b = renderShapes(back, r.rasterW, r.rasterH);
-        double rt = computePsnr(a, b, 1);                         // ida y vuelta del exportador (informativo)
-        // validación real: parámetros de cada objeto tras exportar y reinterpretar
+        std::string gd = toGdString(r, eo);
+        std::vector<ParsedObj> objs; bool fmtOk;
+        auto back = parseGd(gd, r, eo, chanColors, objs, fmtOk);
+        if (!fmtOk) why += "FORMATO ";
+        if (objs.size() != nObj) why += "NUM-OBJETOS ";
+
+        // reglas de la cadena
+        int baseMaxKey = -1000000, inkMinKey = 1000000; int textIdx = 0;
+        for (auto& po : objs) {
+            if (!po.hasZ) why += "SIN-Z-ORDER ";
+            if (r.colored && po.hasHsv) why += "HSV-EN-MODO-CANALES ";
+            if (!r.colored && !r.mono && !po.hasHsv) why += "SIN-HSV ";
+            if (r.colored && (po.ch < 2 || po.ch > 999 || used.count(po.ch))) why += "CANAL-USADO ";
+            if (r.mono) {
+                if (!po.hasLayer) why += "SIN-CAPA ";
+                // orden de dibujo: (capa, z-order). La base/papel debe quedar siempre por debajo de la tinta.
+                int key = po.layer * 100000 + po.z;
+                bool isText = po.id == 914;
+                bool isBase = !isText && po.layer == eo.layerBase;
+                if (isBase) baseMaxKey = std::max(baseMaxKey, key); else inkMinKey = std::min(inkMinKey, key);
+            }
+            if (po.id == 914) {
+                std::string txt = b64dec(po.b64);
+                if (int(txt.size()) > opt.asciiChunk) why += "TEXTO-MAS-LARGO-QUE-CHUNK ";
+                if (textIdx >= int(r.textRows.size()) || txt != r.textRows[size_t(textIdx)].text) why += "TEXTO-DISTINTO ";
+                ++textIdx;
+            }
+        }
+        if (r.mono && baseMaxKey != -1000000 && inkMinKey != 1000000 && baseMaxKey >= inkMinKey) why += "BASE-POR-ENCIMA-DE-LA-TINTA ";
+
+        // parámetros tras exportar y reinterpretar
         double maxPos = 0, maxRot = 0; int maxCol = 0;
-        if (back.size() == r.shapes.size()) {      // (las filas de texto se validan aparte)
+        if (back.size() == r.shapes.size()) {
             for (size_t i = 0; i < back.size(); ++i) {
                 const Shape &p0 = r.shapes[i], &p1 = back[i];
                 maxPos = std::max({maxPos, double(std::abs(p0.cx - p1.cx)), double(std::abs(p0.cy - p1.cy)), double(std::abs(p0.w - p1.w)), double(std::abs(p0.h - p1.h))});
                 double dr = std::abs(std::fmod(p0.rot - p1.rot, 180.0f)); maxRot = std::max(maxRot, std::min(dr, 180.0 - dr));
                 maxCol = std::max({maxCol, std::abs(int(p0.r) - p1.r), std::abs(int(p0.g) - p1.g), std::abs(int(p0.b) - p1.b)});
             }
-        }
-        bool okGd = fmtOk && cnt == int(r.shapes.size() + r.textRows.size()) && maxPos < 0.01 && maxRot < 0.02 && maxCol <= 1;
-        if (!okCount || !okGd) ++fails;
+        } else why += "FORMAS ";
+        if (maxPos >= 0.01 || maxRot >= 0.02 || maxCol > 1) why += "DESVIACION ";
 
-        // PSNR comparable: todas las formas se escalan a una referencia común
-        double common = 0;
+        // cobertura: sin huecos transparentes cuando la imagen es opaca
+        double cover = 1.0;
+        Image a = renderShapes(r.shapes, r.rasterW, r.rasterH);
+        if (!hasTransparency(src, 128) && !r.shapes.empty()) {
+            size_t c = 0; for (size_t i = 3; i < a.rgba.size(); i += 4) c += a.rgba[i] > 0;
+            cover = double(c) / double(a.w * a.h);
+            if (cover < 0.999) why += "HUECOS(" + std::to_string(int(cover * 1000) / 10.0).substr(0, 4) + "%) ";
+        }
+
+        // PSNR comparable (solo métodos principales)
+        double common = -1;
         if (!r.mono) {
+            Image srcRef = opt.grayscale ? toGrayscale(src) : src;
             int rw, rh; fitSize(src.w, src.h, 512, rw, rh);
-            Image refc = resizeArea(src, rw, rh);
+            Image refc = resizeArea(srcRef, rw, rh);
             std::vector<Shape> sc = r.shapes; float fx = float(rw) / r.rasterW, fy = float(rh) / r.rasterH;
             for (auto& s : sc) { s.cx *= fx; s.cy *= fy; s.w *= fx; s.h *= fy; }
             common = computePsnr(refc, renderShapes(sc, rw, rh), 128);
         }
-        r.psnr = r.mono ? -1 : common;
-        if (!r.textRows.empty()) {                              // muestra del arte ASCII
-            { char tp[512]; std::snprintf(tp, sizeof tp, "%s/ascii_%d.txt", outDir.c_str(), budget); FILE* f = std::fopen(tp, "w");
-              if (f) { for (auto& t : r.textRows) std::fprintf(f, "%s\n", t.text.c_str()); std::fclose(f); } }
-            std::printf("--- ASCII: %zu filas x %zu columnas ---\n", r.textRows.size(), r.textRows[0].text.size());
+        if (!why.empty()) ++fails;
 
-        }
-        char name[64]; std::snprintf(name, sizeof name, "%s", methodInfo(Method(m)).name);
-        char ps[16]; if (r.mono) std::snprintf(ps, sizeof ps, "    -"); else std::snprintf(ps, sizeof ps, "%.2f", r.psnr);
-        std::printf("%-28s %8zu %8s %9.0f %4dx%-4d %s%s  (gd %zu KB, dpos %.4f drot %.3f dcol %d%s)\n", name, r.shapes.size() + r.textRows.size(), ps, r.ms,
-                    r.rasterW, r.rasterH, okCount ? "OK" : "SUPERA-PRESUPUESTO ", okGd ? "" : " GD-FALLA", gd.size() / 1024, maxPos, maxRot, maxCol, r.colored ? (std::string(", canales ") + std::to_string(trigCount)).c_str() : ""); (void)rt;
+        char ps[16]; if (common < 0) std::snprintf(ps, sizeof ps, "    -"); else std::snprintf(ps, sizeof ps, "%.2f", common);
+        std::printf("%-26s %7zu %8s %7.0f %6zu %4zu  %s\n", methodInfo(Method(m)).name, nObj, ps, r.ms, gd.size() / 1024,
+                    r.colored ? cmap.colors.size() : size_t(0), why.empty() ? "OK" : why.c_str());
+
         char path[512]; std::snprintf(path, sizeof path, "%s/m%d_%d.png", outDir.c_str(), m + 1, budget);
-        // vista previa ampliada a un lado largo de ~800 px
-        int kk = std::max(1, 1200 / std::max(r.rasterW, r.rasterH));
-        savePreview(path, r.mono ? renderShapesScaled(r.shapes, r.rasterW, r.rasterH, kk) : a, true);
+        if (!r.previewImg.empty()) {                                   // ASCII: bloques de color de la vista previa
+            Image big = r.previewImg;
+            savePreview(path, big, true);
+        } else {
+            int kk = std::max(1, (r.mono ? 1200 : 640) / std::max(r.rasterW, r.rasterH));
+            savePreview(path, r.mono ? renderShapesScaled(r.shapes, r.rasterW, r.rasterH, kk) : a, true);
+        }
+        if (!r.textRows.empty()) {
+            char tp[512]; std::snprintf(tp, sizeof tp, "%s/ascii_%d.txt", outDir.c_str(), budget);
+            if (FILE* f = std::fopen(tp, "w")) { for (auto& t : r.textRows) std::fprintf(f, "%.1f %.1f %d %d %d %s\n", t.cx, t.cy, t.r, t.g, t.b, t.text.c_str()); std::fclose(f); }
+        }
     }
-    // referencia redimensionada para comparar a ojo
     {
         int w, h; fitSize(src.w, src.h, 768, w, h);
         char path[512]; std::snprintf(path, sizeof path, "%s/ref.png", outDir.c_str());

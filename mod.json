@@ -98,7 +98,7 @@
 			"min": 1,
 			"max": 1020,
 			"name": "Canal negro",
-			"description": "Canal de color usado para la tinta negra en los estilos monocromos (1010 = negro)."
+			"description": "Canal de color usado para la tinta negra en los estilos monocromos (1010 = negro). Solo se usa con \"Blanco y negro con canales 1010/1011\"."
 		},
 		"white-channel": {
 			"type": "int",
@@ -106,7 +106,7 @@
 			"min": 1,
 			"max": 1020,
 			"name": "Canal blanco",
-			"description": "Canal de color usado para el papel blanco en los estilos monocromos (1011 = blanco). Si el papel no sale blanco, cambia este valor."
+			"description": "Canal de color usado para el papel blanco en los estilos monocromos (1011 = blanco). Si el papel no sale blanco, cambia este valor. Solo se usa con \"Blanco y negro con canales 1010/1011\"."
 		},
 		"ascii-advance": {
 			"type": "float",
@@ -125,16 +125,16 @@
 			"description": "Proporcion alto/ancho de una celda de texto. Con fuentes monoespaciadas suele estar entre 1.0 y 2.0."
 		},
 		"title-palette": {
-			"name": "Colores en canales (estilos ligeros)",
+			"name": "Canales de color",
 			"type": "title"
 		},
 		"palette-size": {
 			"type": "int",
-			"default": 12,
-			"min": 2,
-			"max": 64,
-			"name": "Colores de la paleta",
-			"description": "Cuantos canales de color se crean (incluye el del papel). Menos = mas ligero."
+			"default": 48,
+			"min": 4,
+			"max": 200,
+			"name": "Estilos ligeros: canales en color",
+			"description": "Cuantos canales de color usan los estilos ligeros con el check de color (la mitad para las bases, la mitad para la tinta). Mas = colores mas fieles."
 		},
 		"palette-first-channel": {
 			"type": "int",
@@ -142,18 +142,37 @@
 			"min": 2,
 			"max": 999,
 			"name": "Primer canal de la paleta",
-			"description": "Los canales se asignan desde este numero hacia arriba. <cr>Nunca se usa el canal 1.</c> Revisa que no pisen canales que ya uses."
+			"description": "Los canales se buscan desde este numero hacia arriba y se saltan los que el nivel ya usa. <cr>Nunca se usa el canal 1.</c>"
 		},
-		"palette-mode": {
-			"type": "string",
-			"default": "Directo y triggers",
-			"name": "Como crear los canales",
-			"one-of": [
-				"Directo y triggers",
-				"Solo directo",
-				"Solo triggers"
-			],
-			"description": "<cy>Directo</c>: define los colores en los ajustes del nivel (se ven en el editor). <cy>Triggers</c>: crea un trigger de color por canal a la izquierda del inicio (se aplican al jugar). Si algo falla con el modo directo, usa <cg>Solo triggers</c>."
+		"palette-size-main": {
+			"type": "int",
+			"default": 64,
+			"min": 2,
+			"max": 250,
+			"name": "Metodos 1-8: canales en color",
+			"description": "Cuantos canales de color usa cada imagen de los metodos principales con el check <cy>Canales de color</c> (con grises se usan como mucho 32)."
+		},
+		"light-special-channels": {
+			"type": "bool",
+			"default": false,
+			"name": "Blanco y negro con canales 1010/1011",
+			"description": "Los estilos ligeros en blanco y negro usan por defecto 2 canales libres. Activalo para usar los canales especiales 1010 (negro) y 1011 (blanco) en su lugar."
+		},
+		"ascii-chunk": {
+			"type": "int",
+			"default": 60,
+			"min": 8,
+			"max": 400,
+			"name": "ASCII: caracteres por objeto",
+			"description": "Las filas largas se parten en objetos de texto de este tamano y se colocan seguidos (evita que GD recorte o entrecorte el texto). En color se usan trozos mas cortos."
+		},
+		"ascii-kerning": {
+			"type": "int",
+			"default": 0,
+			"min": -100,
+			"max": 100,
+			"name": "ASCII: espaciado de letras",
+			"description": "Espaciado entre caracteres de los objetos de texto (clave 488). Dejalo en 0 salvo que las letras salgan separadas o pegadas."
 		}
 	},
 	"tags": [

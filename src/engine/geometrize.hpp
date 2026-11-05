@@ -44,8 +44,9 @@ public:
     std::vector<Shape> run(int count, int z0, int quality, Progress* prog, float progBase, float progSpan) {
         std::vector<Shape> out;
         out.reserve(size_t(count));
-        const int M = quality == 0 ? 16 : quality == 1 ? 32 : 64;       // candidatos aleatorios
-        const int K = quality == 0 ? 32 : quality == 1 ? 64 : 128;      // pasos de escalada
+        static const int kM[4] = {16, 32, 64, 128}, kK[4] = {32, 64, 128, 256};
+        const int M = kM[std::clamp(quality, 0, 3)];                    // candidatos aleatorios por forma
+        const int K = kK[std::clamp(quality, 0, 3)];                    // pasos de escalada por forma
         std::vector<double> prefix(tileErr.size() + 1, 0.0);
         for (int i = 0; i < count; ++i) {
             if ((i & 63) == 0) {
@@ -209,7 +210,8 @@ inline Image compositeOnMean(const Image& src, int alphaThr, uint8_t& mr, uint8_
 inline void geoRasterSize(const Image& src, const Options& o, bool hybrid, int& W, int& H) {
     int cap = std::min(o.maxRaster, hybrid ? 512 : 384);
     if (!hybrid) {
-        double k = o.quality == 0 ? 8.0 : o.quality == 1 ? 12.0 : 18.0;   // píxeles por objeto
+        static const double kPix[4] = {8.0, 12.0, 18.0, 22.0};
+        double k = kPix[std::clamp(o.quality, 0, 3)];                      // píxeles por objeto
         double a = double(src.w) / src.h;
         double pixels = std::max(1024.0, double(o.budget) * k);
         int w = int(std::lround(std::sqrt(pixels * a))), h = int(std::lround(w / a));
@@ -221,36 +223,68 @@ inline void geoRasterSize(const Image& src, const Options& o, bool hybrid, int& 
     }
 }
 
-// hybridBase = 0 -> Geometrize puro; > 0 -> fracción del presupuesto para la base BSP
+// Calidad efectiva: con pocos objetos sobra tiempo, así que se sube un nivel de búsqueda de forma automática.
+inline int effectiveQuality(const Options& o) {
+    int q = std::clamp(o.quality, 0, 3);
+    if (o.budget <= 3000 && q < 3) ++q;
+    return q;
+}
+
+// Fracción del presupuesto que va a la base BSP del híbrido. Medido en fotos y pinturas a 1.000, 3.000 y 10.000
+// objetos: entre el 10 % y el 35 % casi no cambia el resultado (diferencias de ~0,1 dB); con más base empeora.
+inline double hybridFractionFor(const Options& o) {
+    return o.hybridFraction > 0 ? double(o.hybridFraction) : 0.15;
+}
+
+// hybridBase = 0 -> Geometrize (con una base BSP gruesa del 6 %); > 0 -> fracción del presupuesto para la base BSP
+// Tras generar las formas se recolorean con lo que realmente queda visible, se eliminan las que otras
+// tapan por completo y ese presupuesto se reinvierte en más formas (hasta 3 rondas).
 inline std::vector<Shape> geometrizeShapes(const Image& src, const Options& o, double hybridBase,
                                            Progress* prog, int& outW, int& outH, Image* targetOut = nullptr) {
-    int W, H; geoRasterSize(src, o, hybridBase > 0.0, W, H);
+    const bool hybrid = hybridBase > 0.0;
+    int W, H; geoRasterSize(src, o, true, W, H);          // misma resolución (hasta 512) que el híbrido: con menos se pierde detalle
     Image ras = resizeArea(src, W, H);
     uint8_t mr, mg, mb;
     Image target = compositeOnMean(ras, o.alphaThreshold, mr, mg, mb);
     outW = W; outH = H;
     if (targetOut) *targetOut = target;
+    const int budget = std::max(1, o.budget);
+    const int quality = effectiveQuality(o);
+
+    // Híbrido: si el BSP con todo el presupuesto ya es casi perfecto (ilustraciones planas, logos), no hace falta más.
+    if (hybrid) {
+        std::vector<Shape> full = treeShapes(ras, budget, o.alphaThreshold, true, nullptr);
+        Image r = renderShapes(full, W, H);
+        if (computePsnr(target, r, 1) >= 38.0 && !isCancelled(prog)) { for (auto& s : full) s.z = 0; report(prog, 1.f); return full; }
+    }
 
     std::vector<Shape> shapes;
     Geo geo(target, o.seed);
-    int budget = std::max(1, o.budget);
-    if (hybridBase > 0.0) {
-        int b1 = std::max(1, int(budget * hybridBase));
+    const double frac = hybrid ? hybridBase : 0.06;                    // Geometrize también parte de una base gruesa
+    int z0 = 1;
+    {
+        int b1 = std::max(1, int(budget * frac));
         shapes = treeShapes(ras, b1, o.alphaThreshold, true, nullptr);
         for (auto& s : shapes) s.z = 0;
         Image base = renderShapes(shapes, W, H);
         geo.setCanvasImage(base, mr, mg, mb);
-        report(prog, 0.1f);
-        int left = budget - int(shapes.size());
-        auto extra = geo.run(left, 1, o.quality, prog, 0.1f, 0.9f);
-        shapes.insert(shapes.end(), extra.begin(), extra.end());
-    } else {
-        geo.setCanvasFlat(mr, mg, mb);
-        Shape bg; bg.cx = W * 0.5f; bg.cy = H * 0.5f; bg.w = float(W); bg.h = float(H); bg.r = mr; bg.g = mg; bg.b = mb; bg.z = 0;
-        shapes.push_back(bg);
-        auto extra = geo.run(budget - 1, 1, o.quality, prog, 0.f, 1.f);
+        report(prog, 0.05f);
+        auto extra = geo.run(budget - int(shapes.size()), z0, quality, prog, 0.05f, 0.55f);
         shapes.insert(shapes.end(), extra.begin(), extra.end());
     }
+    for (int round = 0; round < 3 && !isCancelled(prog); ++round) {
+        refitVisible(shapes, target, 255, true);                 // recolorea y quita lo tapado
+        int freed = budget - int(shapes.size());
+        if (freed < std::max(6, budget / 150)) break;
+        int zNext = 1; for (auto const& s : shapes) zNext = std::max<int>(zNext, s.z + 1);
+        if (zNext > 31000) break;
+        Image canvas = renderShapes(shapes, W, H);
+        geo.setCanvasImage(canvas, mr, mg, mb);
+        auto extra = geo.run(freed, zNext, quality, prog, 0.65f + 0.1f * round, 0.1f);
+        shapes.insert(shapes.end(), extra.begin(), extra.end());
+    }
+    refitVisible(shapes, target, 255, true);
+    if (int(shapes.size()) > budget) shapes.resize(size_t(budget));
     return shapes;
 }
 

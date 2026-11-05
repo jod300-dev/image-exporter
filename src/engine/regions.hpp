@@ -219,7 +219,7 @@ inline size_t runRows(const Image& im, int tol, int alphaThr, size_t budget, std
     return count;
 }
 
-inline Candidate runsBest(const Image& src, const Options& o, Progress* prog) {
+inline Candidate runsBestOne(const Image& src, const Options& o, Progress* prog) {
     int Wb, Hb; fitSize(src.w, src.h, std::min(o.maxRaster, 640), Wb, Hb);
     Image reference = resizeArea(src, Wb, Hb);
     const double scales[] = {1.0, 0.8, 0.65, 0.5, 0.4, 0.3, 0.22, 0.15, 0.1};
@@ -247,6 +247,26 @@ inline Candidate runsBest(const Image& src, const Options& o, Progress* prog) {
     }
     if (best.w == 0) { int gw, gh; best.shapes = gridShapes(src, o.budget, o.alphaThreshold, gw, gh); best.w = gw; best.h = gh; }
     return best;
+}
+
+inline Image transposed(const Image& s) {
+    Image t; t.w = s.h; t.h = s.w; t.rgba.resize(s.rgba.size());
+    for (int y = 0; y < s.h; ++y) for (int x = 0; x < s.w; ++x)
+        std::copy(s.at(x, y), s.at(x, y) + 4, t.at(y, x));
+    return t;
+}
+
+// Franjas: prueba en filas y en columnas (imagen traspuesta) y se queda con la dirección que comprime mejor.
+inline Candidate runsBest(const Image& src, const Options& o, Progress* prog) {
+    Candidate a = runsBestOne(src, o, prog);
+    if (isCancelled(prog)) return a;
+    Candidate b = runsBestOne(transposed(src), o, prog);
+    if (b.psnr > a.psnr + 0.05 && !b.shapes.empty()) {
+        for (auto& s : b.shapes) { std::swap(s.cx, s.cy); std::swap(s.w, s.h); }
+        std::swap(b.w, b.h);
+        return b;
+    }
+    return a;
 }
 
 } // namespace gdx

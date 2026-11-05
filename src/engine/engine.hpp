@@ -18,41 +18,41 @@ struct MethodInfo { const char* name; const char* desc; bool slow; };
 inline const MethodInfo& methodInfo(Method m) {
     static const MethodInfo kInfo[int(Method::COUNT)] = {
         {"1. Cuadricula uniforme",
-         "Una celda por objeto con el color medio. Rapido y predecible; ideal para pixel art.", false},
+         "Una celda por objeto con el color medio. Rapido; ideal para pixel art.", false},
         {"2. Quadtree adaptativo",
-         "Divide en 4 solo donde hay detalle (mejor-primero). Usa justo el limite de objetos.", false},
+         "Divide en 4 solo donde hay detalle. Usa justo el limite de objetos.", false},
         {"3. BSP adaptativo (k-d)",
-         "Cortes optimos en X o Y: rectangulos de cualquier proporcion. Muy buena calidad en fotos.", false},
+         "Cortes optimos en X o Y: rectangulos de cualquier forma. Muy bueno en fotos.", false},
         {"4. Piramide de capas",
-         "Bloque grande + capas de detalle solo donde el color difiere. Ahorra muchos objetos.", false},
+         "Bloque grande y capas de detalle solo donde el color cambia. Ahorra objetos.", false},
         {"5. Regiones por paleta",
-         "Reduce a una paleta y fusiona zonas iguales en rectangulos grandes. Ideal para ilustraciones.", false},
+         "Reduce la paleta y fusiona zonas iguales en rectangulos. Para ilustraciones.", false},
         {"6. Franjas horizontales",
-         "Tiras de color por filas con tolerancia. Estilo escaneo; muy rapido y con pocos objetos.", false},
+         "Tiras de color por filas o columnas con tolerancia. Estilo escaneo, muy rapido.", false},
         {"7. Rectangulos rotados",
-         "Busqueda aleatoria de rectangulos girados que reducen el error (estilo Geometrize).", true},
+         "Rectangulos girados por busqueda aleatoria (estilo Geometrize). Aspecto pictorico.", true},
         {"8. Hibrido BSP + rotados",
-         "Base BSP y el resto del presupuesto en rectangulos rotados sobre los residuos. Maxima calidad.", true},
+         "Base BSP mas rectangulos rotados sobre los residuos. Maxima calidad.", true},
         {"9. Halftone (diamantes)",
-         "Trama de periodico: cuadrados girados 45 grados cuyo tamano depende de la oscuridad. Sin HSV.", false},
+         "Trama de periodico: diamantes cuyo tamano sigue la oscuridad. Sin HSV.", false},
         {"10. Grabado de lineas",
-         "Lineas paralelas con grosor variable, como un grabado antiguo. Sin HSV, pocos objetos.", false},
+         "Lineas paralelas de grosor variable, como un grabado. Pocos objetos.", false},
         {"11. Sombreado cruzado",
-         "Capas de rayas a 45, 135, 0 y 90 grados segun la oscuridad (cross-hatch). Sin HSV.", false},
+         "Capas de rayas a 45, 135, 0 y 90 grados segun la oscuridad. Sin HSV.", false},
         {"12. Estarcido (puntos)",
-         "Nube de puntos mas densa donde la imagen es oscura (puntillismo). Sin HSV.", false},
+         "Nube de puntos mas densa donde la imagen es oscura (puntillismo).", false},
         {"13. Tramado Bayer",
          "Blanco y negro con tramado ordenado, fusionado en rectangulos. Sin HSV.", false},
         {"14. Tinta (comic)",
-         "Umbral adaptativo: manchas de tinta solidas, estilo comic. Muy pocos objetos. Sin HSV.", false},
+         "Umbral adaptativo: manchas de tinta solidas, estilo comic. Muy pocos objetos.", false},
         {"15. Boceto de trazos",
-         "Trazos cortos orientados sobre los bordes, como un dibujo a lapiz. Sin HSV.", false},
+         "Trazos cortos orientados sobre los bordes, como un dibujo a lapiz.", false},
         {"16. Espiral",
-         "Una espiral cuyo grosor sigue la oscuridad de la imagen. Sin HSV.", false},
+         "Una espiral cuyo grosor sigue la oscuridad de la imagen.", false},
         {"17. Diagonales 10 PRINT",
-         "Una diagonal / o \\ por celda segun la estructura local, grosor segun tono. Sin HSV.", false},
+         "Una diagonal / o \\ por celda segun la estructura local y el tono.", false},
         {"18. Arte ASCII (texto)",
-         "Una fila de texto por objeto: la imagen entera en ~100 objetos. Pide fuente monoespaciada.", false},
+         "Texto en objetos de texto: la imagen en pocos objetos. Pide fuente monoespaciada.", false},
     };
     return kInfo[int(m)];
 }
@@ -124,7 +124,7 @@ inline Result convert(const Image& srcIn, Method method, const Options& opt, Pro
         case Method::Geometrize:
         case Method::Hybrid: {
             int w, h; Image target;
-            res.shapes = geometrizeShapes(src, o, method == Method::Hybrid ? 0.55 : 0.0, prog, w, h, &target);
+            res.shapes = geometrizeShapes(src, o, method == Method::Hybrid ? hybridFractionFor(o) : 0.0, prog, w, h, &target);
             res.rasterW = w; res.rasterH = h; reference = std::move(target); haveRef = true;
             break;
         }

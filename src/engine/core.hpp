@@ -62,7 +62,8 @@ struct Options {
     int budget = 10000;                  // máximo de objetos (duro)
     int maxRaster = 768;                 // lado máximo del raster interno
     int alphaThreshold = 128;            // alfa >= umbral => píxel opaco
-    int quality = 1;                     // 0 rápido, 1 normal, 2 alto
+    int quality = 2;                     // 0 rápido, 1 normal, 2 alto, 3 máximo
+    float hybridFraction = -1.f;         // fracción del presupuesto para la base BSP del híbrido (<0 = automática)
     uint32_t seed = 1337;
     bool invertInk = false;              // estilos monocromos: tinta blanca sobre fondo negro
     float asciiAspect = 1.0f;            // ASCII: alto/ancho de una celda de carácter (según la fuente)

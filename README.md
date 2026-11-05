@@ -89,13 +89,40 @@ Ajustes utiles: *Tinta blanca sobre fondo negro*, *Canal negro/blanco*, *ASCII: 
 ### Sobre los borrados automaticos de RobTop
 No he encontrado informacion publica sobre la regla exacta, asi que **no hay garantia** de que un nivel no se borre. Lo que si hace el mod es atacar lo que se sabe que pesa: menos objetos, sin HSV por objeto y un indicador (`~KB`) del tamano de la cadena para comparar metodos. Si vas a subir un nivel, prueba antes con uno pequeno.
 
+## La ventana (430x268, cabe en los 320 de alto de la pantalla de GD)
+
+* **Izquierda:** vista previa (140x140) y estado: objetos, tamano aproximado de la cadena (`~KB`), calidad en dB y tiempo.
+* **Derecha:** dos **pestanas**, *Principales* (metodos 1-8) y *Ligeros* (estilos 9-18); flechas para cambiar de metodo con su descripcion en dos lineas; dos **sliders** (*Objetos*, de 500 a 10.000 en pasos de 100, y *Lado largo*, de 150 a 6.000 u); y una **sola fila de color** que cambia con la pestana (*Principales*: Canales / Gris HSV / Gris canales, ninguno = HSV a color; *Ligeros*: Colores en canales).
+* **Botones:** *Imagen*, *Colocar*, *i* (ayuda) y *Ajustes* (abre los ajustes del mod).
+* La ventana recuerda la ultima configuracion. El calculo se rehace 0,35 s despues de soltar un slider.
+
+## Calidad de los 8 metodos principales segun el numero de objetos
+
+Medido con PSNR y SSIM (luma) contra una referencia comun a 512 px, en 4 imagenes (foto, pintura, ilustracion plana y logo) a 1.000 / 3.000 / 10.000 objetos. PSNR en dB; entre parentesis, antes de esta version:
+
+| Metodo | 1.000 | 3.000 | 10.000 |
+|---|---|---|---|
+| 3 BSP | 26,9 (26,7) | 34,2 (33,7) | 50,6 (50,3) |
+| 4 Piramide | 20,1 (19,7) | 23,8 (23,3) | 31,8 (30,8) |
+| 7 Rectangulos rotados | **30,4** (20,9) | **36,3** (23,3) | **44,9** (26,3) |
+| 8 Hibrido | 30,0 (27,3) | 37,0 (32,9) | 51,3 (45,8) |
+
+Que cambio:
+* **Recolor por visibilidad:** en los metodos con capas (Piramide, 7 y 8) cada forma toma como color la media de los pixeles que realmente se ven, y las formas totalmente tapadas por otras se **eliminan y su presupuesto se reinvierte** en mas formas (hasta 3 rondas).
+* **Rectangulos rotados** parte ahora de una base BSP gruesa (6 %) y usa la misma resolucion interna que el Hibrido; antes empezaba de un fondo plano y convergia muy despacio.
+* **Hibrido:** base BSP del 15 % (medido: entre 10 % y 35 % da lo mismo; mas base empeora). Si el BSP con todo el presupuesto ya es casi perfecto (>= 38 dB: logos, ilustraciones), devuelve el BSP.
+* **BSP y Quadtree:** la prioridad mira dos niveles (un corte pobre que abre otro muy valioso sube en la cola). Se probo ademas una fase de intercambios fusionar+dividir y **no mejoraba**, asi que se descarto: el voraz ya es casi optimo en esa familia.
+* **Franjas:** elige filas o columnas segun lo que comprima mejor.
+* **Calidad de busqueda:** por defecto *Alto* (antes *Normal*), nuevo nivel *Maximo*, y con 3.000 objetos o menos se sube un nivel solo (sobra tiempo). *Alto* aporta ~+0,9 dB y +0,02 SSIM frente a *Normal* por ~1,7x de tiempo; con 10.000 objetos el 7 y el 8 tardan hasta ~5 s en una imagen de 512 px.
+* Sin cambios apreciables: Cuadricula (ya es el promedio exacto), Regiones.
+
 ## Estructura
 
 ```
 src/engine/   motor de conversion SIN dependencias de Geode (core, partition, regions, geometrize, mono, palette, lightcolor, gdexport)
 src/ui/       ventana (Popup): metodo, objetos, tamano, vista previa, colocar
 src/main.cpp  boton en la pestana Edit (hook de EditorUI::createMoveMenu)
-tests/        engine_test.cpp: prueba autonoma del motor
+tests/        engine_test.cpp (validacion) y bench.cpp (PSNR/SSIM por metodo y presupuesto)
 .github/      workflow oficial de geode-sdk/build-geode-mod
 ```
 

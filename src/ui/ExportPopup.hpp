@@ -4,15 +4,15 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <vector>
 
 #include "engine.hpp"
 #include "gdexport.hpp"
 
 using namespace geode::prelude;
 
-// Ventana del exportador: elegir imagen, método, presupuesto de objetos y tamaño,
-// ver una vista previa del resultado y colocarlo en el editor.
-// Debajo de los 8 métodos normales hay una sección aparte de estilos monocromos.
+// Ventana del exportador (430x268, cabe en los 320 de alto de la pantalla de GD):
+//   izquierda: vista previa + estado        derecha: pestañas Principales/Ligeros, método, sliders, opciones de color
 class ExportPopup : public geode::Popup {
 public:
     static ExportPopup* create(EditorUI* editor);
@@ -33,29 +33,26 @@ protected:
 
     bool init(EditorUI* editor);
 
-    // acciones de los botones
+    // --- acciones ---
     void onPick(CCObject*);
     void onPlace(CCObject*);
     void onInfo(CCObject*);
-    void onMethodPrev(CCObject*) { stepMethod(-1); }
-    void onMethodNext(CCObject*) { stepMethod(+1); }
-    void onBudgetDec(CCObject*) { stepBudget(-1); }
-    void onBudgetInc(CCObject*) { stepBudget(+1); }
-    void onSizeDec(CCObject*) { stepSize(-1); }
-    void onSizeInc(CCObject*) { stepSize(+1); }
-    void onMonoPrev(CCObject*) { stepMono(-1); }
-    void onMonoNext(CCObject*) { stepMono(+1); }
-    void onColorToggle(CCObject*);          // check de los estilos ligeros: colores en canales
+    void onSettings(CCObject*);
+    void onTabMain(CCObject*) { setTab(0); }
+    void onTabLight(CCObject*) { setTab(1); }
+    void onPrev(CCObject*) { stepMethod(-1); }
+    void onNext(CCObject*) { stepMethod(+1); }
+    void onBudgetSlider(CCObject* sender);
+    void onSizeSlider(CCObject* sender);
+    void onColorToggle(CCObject*);                                       // pestaña Ligeros: colores en canales
     void onMainChannels(CCObject*) { setMainMode(m_mainMode == 1 ? 0 : 1); }
     void onMainGrayHsv(CCObject*) { setMainMode(m_mainMode == 2 ? 0 : 2); }
     void onMainGrayCh(CCObject*) { setMainMode(m_mainMode == 3 ? 0 : 3); }
 
+    void setTab(int tab);
+    void setMainMode(int mode);       // 0 HSV color (por defecto), 1 canales de color, 2 gris HSV, 3 gris canales
     void stepMethod(int dir);
-    void stepMono(int dir);
-    void stepBudget(int dir);
-    void stepSize(int dir);
-    void setMainMode(int mode);                // 0 HSV color (por defecto), 1 canales de color, 2 gris HSV, 3 gris canales
-    gdx::Method effectiveMethod() const;       // el estilo monocromo, si hay uno activo; si no, el normal
+    gdx::Method effectiveMethod() const;
     void refreshLabels();
 
     void loadImageBytes(std::vector<uint8_t> const& bytes);
@@ -64,13 +61,13 @@ protected:
     void tick(float);
     void applyResult(std::shared_ptr<Job> job);
     void buildPreview();
-    void setStatus(std::string const& s, std::string const& note = "");
+    void setStatus(std::string const& a, std::string const& b = "", std::string const& note = "");
     gdx::Options makeOptions() const;
     gdx::GdExportOptions makeExportOptions() const;
     CCPoint placementOrigin() const;
-    std::set<int> usedChannels() const;                              // canales que el nivel ya usa (objetos o colores definidos)
-    void applyChannelColorsDirect(gdx::GdExportOptions const& eo, gdx::ChannelMap const& cmap);   // define los canales en el selector de color del nivel
-    bool colorModeOn() const { return m_colorCheck && m_mono > 0; }
+    std::set<int> usedChannels() const;                                  // canales que el nivel ya usa (objetos o colores definidos)
+    void applyChannelColorsDirect(gdx::GdExportOptions const& eo, gdx::ChannelMap const& cmap);
+    bool colorModeOn() const { return m_tab == 1 && m_colorCheck; }
 
     EditorUI* m_editor = nullptr;
     std::shared_ptr<const gdx::Image> m_image;
@@ -79,25 +76,30 @@ protected:
     gdx::Result m_result;
     bool m_hasResult = false;
 
-    int m_method = 2;       // método normal (0..7); BSP por defecto
-    int m_mono = 0;         // 0 = ninguno (se usa el normal); 1..10 = estilo monocromo
-    bool m_colorCheck = false;   // estilos ligeros: colores de la imagen en canales de color (sin HSV)
-    int m_mainMode = 0;          // métodos 1-8: 0 HSV color, 1 canales de color, 2 gris HSV, 3 gris canales
-    int m_budget = 10000;   // máximo permitido
-    int m_sizeIdx = 3;
+    int m_tab = 0;               // 0 principales (1-8), 1 ligeros (9-18)
+    int m_method = 2;            // método principal (0..7); BSP por defecto
+    int m_style = 0;             // estilo ligero (0..9)
+    int m_mainMode = 0;          // principales: 0 HSV color, 1 canales de color, 2 gris HSV, 3 gris canales
+    bool m_colorCheck = false;   // ligeros: colores de la imagen en canales de color (sin HSV)
+    int m_budget = 10000;        // máximo permitido
+    int m_sizeU = 600;           // lado largo en unidades de GD
 
+    CCMenuItemToggler* m_tabMain = nullptr;
+    CCMenuItemToggler* m_tabLight = nullptr;
     CCLabelBMFont* m_methodLabel = nullptr;
     CCLabelBMFont* m_descLabel = nullptr;
-    CCLabelBMFont* m_budgetLabel = nullptr;
-    CCLabelBMFont* m_sizeLabel = nullptr;
-    CCLabelBMFont* m_monoLabel = nullptr;
-    CCLabelBMFont* m_monoDescLabel = nullptr;
-    CCLabelBMFont* m_colorLabel = nullptr;
-    CCMenuItemToggler* m_colorToggle = nullptr;
+    CCLabelBMFont* m_budgetValue = nullptr;
+    CCLabelBMFont* m_sizeValue = nullptr;
+    Slider* m_budgetSlider = nullptr;
+    Slider* m_sizeSlider = nullptr;
     CCMenuItemToggler* m_chkChannels = nullptr;
     CCMenuItemToggler* m_chkGrayHsv = nullptr;
     CCMenuItemToggler* m_chkGrayCh = nullptr;
-    CCLabelBMFont* m_statusLabel = nullptr;
+    CCMenuItemToggler* m_chkColor = nullptr;
+    std::vector<CCNode*> m_mainOpts;                                      // controles de la fila de color de Principales
+    std::vector<CCNode*> m_lightOpts;                                     // ... y de Ligeros
+    CCLabelBMFont* m_statA = nullptr;
+    CCLabelBMFont* m_statB = nullptr;
     CCLabelBMFont* m_noteLabel = nullptr;
     CCNode* m_previewHolder = nullptr;
     CCSprite* m_preview = nullptr;

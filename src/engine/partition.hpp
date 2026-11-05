@@ -7,7 +7,9 @@
 // ============================================================================
 #pragma once
 #include <queue>
+#include <unordered_map>
 #include "core.hpp"
+#include "refit.hpp"
 
 namespace gdx {
 
@@ -112,29 +114,41 @@ struct BspSplitter {
     }
 };
 
-// Algoritmo mejor-primero: siempre divide la hoja cuya división reduce más error,
-// mientras el número de objetos no supere el presupuesto.
+// Algoritmo mejor-primero: siempre divide la hoja con más prioridad, mientras el nº de objetos no supere el
+// presupuesto. La prioridad mira dos niveles: un corte con poca ganancia inmediata pero que abre otro muy
+// valioso (bordes, texturas) sube en la cola en vez de quedarse atrás.
+// (Se probó además una fase de intercambios fusionar+dividir: no mejoraba, el voraz ya es casi óptimo aquí.)
 template <class Splitter>
 std::vector<Shape> bestFirstTree(const Stats& st, int budget, Splitter splitter, Progress* prog) {
     struct TNode { Rect r; SplitInfo sp; int emit; bool split; };
     std::vector<TNode> nodes;
     nodes.reserve(size_t(budget) * 2 + 16);
     std::priority_queue<std::pair<double, int>> pq;
+    std::unordered_map<uint64_t, SplitInfo> cache;
+    cache.reserve(size_t(budget) * 3 + 16);
 
-    auto emitOf = [&](const Rect& r) {
-        return Stats::mostlyOpaque(st.query(r.x0, r.y0, r.x1, r.y1)) ? 1 : 0;
+    auto keyOf = [](const Rect& r) { return (uint64_t(r.x0) << 48) | (uint64_t(r.y0) << 32) | (uint64_t(r.x1) << 16) | uint64_t(r.y1); };
+    auto splitCached = [&](const Rect& r) -> const SplitInfo& {
+        auto it = cache.find(keyOf(r));
+        if (it == cache.end()) it = cache.emplace(keyOf(r), splitter(r)).first;
+        return it->second;
     };
+    auto emitOf = [&](const Rect& r) { return Stats::mostlyOpaque(st.query(r.x0, r.y0, r.x1, r.y1)) ? 1 : 0; };
     auto makeNode = [&](const Rect& r) {
-        TNode n; n.r = r; n.sp = splitter(r); n.emit = emitOf(r); n.split = false;
+        TNode n; n.r = r; n.sp = splitCached(r); n.emit = emitOf(r); n.split = false;
         nodes.push_back(n);
         int i = int(nodes.size()) - 1;
-        if (nodes[i].sp.nk > 0 && nodes[i].sp.gain > 1e-9) pq.push({nodes[i].sp.gain, i});
+        const SplitInfo& sp = nodes[i].sp;
+        if (sp.nk > 0 && sp.gain > 1e-9) {
+            double g2 = 0;
+            for (int k = 0; k < sp.nk; ++k) g2 = std::max(g2, splitCached(sp.kids[k]).gain);
+            pq.push({std::max(sp.gain, 0.5 * (sp.gain + g2)), i});
+        }
         return i;
     };
 
-    int leaves = 0;
     int root = makeNode({0, 0, st.w, st.h});
-    leaves = nodes[root].emit;
+    int leaves = nodes[root].emit;
     int iter = 0;
     while (!pq.empty()) {
         int i = pq.top().second; pq.pop();
@@ -238,13 +252,36 @@ inline std::vector<Shape> pyramidShapes(const Image& raster, int budget, int alp
         for (int it = 0; it < 44 && hi / lo > 1.004; ++it) {
             double mid = std::sqrt(lo * hi);
             if (pyrRun(st, mid, B, false, nullptr) <= B) hi = mid; else lo = mid;
-            report(prog, 0.9f * float(it + 1) / 44.f);
+            report(prog, 0.5f * float(it + 1) / 44.f);
             if (isCancelled(prog)) break;
         }
         while (pyrRun(st, hi, B, false, nullptr) > B) hi *= 1.02;  // seguridad
     }
+    // Segunda fase: los bloques padre totalmente tapados por sus hijos no se ven. Se cuentan solo las formas
+    // visibles, así que se puede bajar lambda (más detalle) hasta llenar el presupuesto de verdad.
+    auto visible = [&](double lam, std::vector<Shape>* keep) {
+        std::vector<Shape> v;
+        pyrRun(st, lam, B * 2, true, &v);
+        refitVisible(v, raster, alphaThr, true);
+        size_t n = v.size();
+        if (keep) *keep = std::move(v);
+        return n;
+    };
+    if (hi > lo) {
+        double top = hi, bot = hi * 0.25;
+        while (visible(bot, nullptr) <= B && bot > lo) { top = bot; bot *= 0.5; }      // cota inferior que ya no cabe
+        if (bot < lo) bot = lo;
+        for (int it = 0; it < 13 && top / bot > 1.01; ++it) {
+            double mid = std::sqrt(top * bot);
+            if (visible(mid, nullptr) <= B) top = mid; else bot = mid;
+            report(prog, 0.5f + 0.45f * float(it + 1) / 13.f);
+            if (isCancelled(prog)) break;
+        }
+        hi = top;
+    }
     std::vector<Shape> out;
-    pyrRun(st, hi, B, true, &out);
+    visible(hi, &out);
+    while (out.size() > B) { hi *= 1.03; visible(hi, &out); }       // seguridad
     return out;
 }
 

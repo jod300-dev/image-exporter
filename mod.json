@@ -25,14 +25,15 @@
 		},
 		"quality": {
 			"type": "string",
-			"default": "Normal",
-			"name": "Calidad de calculo",
+			"default": "Alto",
+			"name": "Calidad de calculo (metodos 7 y 8)",
 			"one-of": [
 				"Rapido",
 				"Normal",
-				"Alto"
+				"Alto",
+				"Maximo"
 			],
-			"description": "Afecta a los metodos 7 y 8 (rectangulos rotados): <cy>Alto</c> prueba mas candidatos por objeto y tarda mas."
+			"description": "Cuantos candidatos prueba por cada rectangulo girado. <cy>Alto</c> es el predeterminado; <cy>Maximo</c> es el mejor pero tarda mas. Con 3.000 objetos o menos se sube un nivel solo, porque sobra tiempo."
 		},
 		"max-raster": {
 			"type": "int",

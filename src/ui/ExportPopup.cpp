@@ -49,9 +49,26 @@ ExportPopup::~ExportPopup() {
     if (m_job) m_job->prog.cancel.store(true);
 }
 
+// Parte el texto en líneas cuyo ancho FINAL (con la escala aplicada) no pase de maxWidth. Se mide con una etiqueta real
+// en vez de fiarse del ancho de ajuste de línea de CCLabelBMFont, que no se comporta igual con distintas escalas.
+std::string ExportPopup::wrapText(std::string const& text, float scale, float maxWidth) {
+    std::string out, line, word;
+    for (size_t i = 0; i <= text.size(); ++i) {
+        if (i < text.size() && text[i] != ' ') { word += text[i]; continue; }
+        if (word.empty()) continue;
+        std::string cand = line.empty() ? word : line + " " + word;
+        m_measure->setString(cand.c_str());
+        if (!line.empty() && m_measure->getContentSize().width * scale > maxWidth) { out += line + "\n"; line = word; }
+        else line = cand;
+        word.clear();
+    }
+    return out + line;
+}
+
 bool ExportPopup::init(EditorUI* editor) {
     if (!Popup::init(kPopupW, kPopupH)) return false;
     m_editor = editor;
+    m_measure = CCLabelBMFont::create("", "chatFont.fnt");
     this->setTitle("Image Exporter");
 
     // ajustes recordados de la última vez
@@ -87,7 +104,7 @@ bool ExportPopup::init(EditorUI* editor) {
 
     m_statA = label("Elige una imagen", "chatFont.fnt", 0.85f, 84.f, 194.f);
     m_statB = label("", "chatFont.fnt", 0.75f, 84.f, 207.f);
-    m_noteLabel = CCLabelBMFont::create("", "chatFont.fnt", 150.f, kCCTextAlignmentCenter);
+    m_noteLabel = CCLabelBMFont::create("", "chatFont.fnt", 600.f, kCCTextAlignmentCenter);   // 600: nunca ajusta solo; se parte a mano
     m_noteLabel->setScale(0.6f);
     m_noteLabel->setColor({255, 200, 80});
     put(m_noteLabel, 84.f, 232.f);
@@ -95,14 +112,14 @@ bool ExportPopup::init(EditorUI* editor) {
     // ============ columna derecha ============
     // pestañas
     auto makeTab = [&](char const* text, SEL_MenuHandler cb) {
-        auto off = ButtonSprite::create(text, "bigFont.fnt", "GJ_button_04.png", 0.5f);
-        auto on = ButtonSprite::create(text, "bigFont.fnt", "GJ_button_01.png", 0.5f);
+        auto off = ButtonSprite::create(text, "bigFont.fnt", "GJ_button_04.png", 0.34f);
+        auto on = ButtonSprite::create(text, "bigFont.fnt", "GJ_button_01.png", 0.34f);
         return CCMenuItemToggler::create(off, on, this, cb);
     };
     m_tabMain = makeTab("Principales", menu_selector(ExportPopup::onTabMain));
     m_tabLight = makeTab("Ligeros", menu_selector(ExportPopup::onTabLight));
-    putBtn(m_tabMain, 226.f, 44.f);
-    putBtn(m_tabLight, 332.f, 44.f);
+    putBtn(m_tabMain, 222.f, 46.f);
+    putBtn(m_tabLight, 316.f, 46.f);
 
     // método: flechas + nombre + descripción
     auto arrow = [&](bool flip, SEL_MenuHandler cb, float x, float y) {
@@ -114,8 +131,8 @@ bool ExportPopup::init(EditorUI* editor) {
     arrow(false, menu_selector(ExportPopup::onPrev), 178.f, 76.f);
     arrow(true,  menu_selector(ExportPopup::onNext), 406.f, 76.f);
     m_methodLabel = label("", "bigFont.fnt", 0.5f, 292.f, 76.f);
-    m_descLabel = CCLabelBMFont::create("", "chatFont.fnt", 380.f, kCCTextAlignmentCenter);   // 380 * 0.66 = 250 px: el ancho de la columna
-    m_descLabel->setScale(0.66f);
+    m_descLabel = CCLabelBMFont::create("", "chatFont.fnt", 600.f, kCCTextAlignmentCenter);   // se parte a mano (ver wrapText)
+    m_descLabel->setScale(0.7f);
     put(m_descLabel, 292.f, 102.f);
 
     // sliders: objetos y lado largo
@@ -146,14 +163,14 @@ bool ExportPopup::init(EditorUI* editor) {
     addCheck(m_chkColor,    m_lightOpts, menu_selector(ExportPopup::onColorToggle), m_colorCheck, 174.f, "Colores en canales (sin HSV)");
 
     // botones de acción
-    auto pickBtn = CCMenuItemSpriteExtra::create(ButtonSprite::create("Imagen", "bigFont.fnt", "GJ_button_01.png", 0.6f), this, menu_selector(ExportPopup::onPick));
-    putBtn(pickBtn, 226.f, 240.f);
-    auto placeBtn = CCMenuItemSpriteExtra::create(ButtonSprite::create("Colocar", "bigFont.fnt", "GJ_button_02.png", 0.6f), this, menu_selector(ExportPopup::onPlace));
-    putBtn(placeBtn, 332.f, 240.f);
+    auto pickBtn = CCMenuItemSpriteExtra::create(ButtonSprite::create("Imagen", "bigFont.fnt", "GJ_button_01.png", 0.42f), this, menu_selector(ExportPopup::onPick));
+    putBtn(pickBtn, 222.f, 240.f);
+    auto placeBtn = CCMenuItemSpriteExtra::create(ButtonSprite::create("Colocar", "bigFont.fnt", "GJ_button_02.png", 0.42f), this, menu_selector(ExportPopup::onPlace));
+    putBtn(placeBtn, 316.f, 240.f);
     auto infoBtn = CCMenuItemSpriteExtra::create(CCSprite::createWithSpriteFrameName("GJ_infoIcon_001.png"), this, menu_selector(ExportPopup::onInfo));
-    putBtn(infoBtn, 414.f, 240.f);
-    auto setBtn = CCMenuItemSpriteExtra::create(ButtonSprite::create("Ajustes", "bigFont.fnt", "GJ_button_04.png", 0.4f), this, menu_selector(ExportPopup::onSettings));
-    putBtn(setBtn, 40.f, 256.f);
+    putBtn(infoBtn, 408.f, 18.f);
+    auto setBtn = CCMenuItemSpriteExtra::create(ButtonSprite::create("Ajustes", "bigFont.fnt", "GJ_button_04.png", 0.26f), this, menu_selector(ExportPopup::onSettings));
+    putBtn(setBtn, 350.f, 18.f);
 
     this->schedule(schedule_selector(ExportPopup::tick), 0.1f);
     this->setTab(m_tab);                       // aplica pestaña, etiquetas y visibilidad
@@ -180,7 +197,7 @@ void ExportPopup::refreshLabels() {
     auto const& info = gdx::methodInfo(effectiveMethod());
     m_methodLabel->setString(info.name);
     m_methodLabel->limitLabelWidth(210.f, 0.5f, 0.2f);
-    m_descLabel->setString(info.desc);
+    m_descLabel->setString(wrapText(info.desc, 0.7f, 244.f).c_str());
 
     char buf[64];
     std::snprintf(buf, sizeof buf, "%d", m_budget);
@@ -203,7 +220,7 @@ void ExportPopup::setStatus(std::string const& a, std::string const& b, std::str
     m_statA->limitLabelWidth(150.f, 0.85f, 0.4f);
     m_statB->setString(b.c_str());
     m_statB->limitLabelWidth(150.f, 0.75f, 0.4f);
-    m_noteLabel->setString(note.c_str());
+    m_noteLabel->setString(wrapText(note, 0.6f, 148.f).c_str());
 }
 
 void ExportPopup::stepMethod(int dir) {
@@ -349,6 +366,7 @@ void ExportPopup::recompute(float) {
     job->src = m_image;
     job->method = effectiveMethod();
     job->opt = makeOptions();
+    job->startMs = gdx::nowMs();
     m_job = job;
     this->setStatus("Calculando... 0%");
 
@@ -369,6 +387,13 @@ void ExportPopup::tick(float) {
         auto job = m_job;
         m_job = nullptr;
         if (job->id == m_jobCounter) this->applyResult(job);
+        return;
+    }
+    // aviso de seguridad: si un cálculo pasa de 90 s se cancela y se avisa, en vez de quedarse en un % para siempre
+    if (gdx::nowMs() - m_job->startMs > 90000.0) {
+        m_job->prog.cancel.store(true);
+        m_job = nullptr;
+        this->setStatus("Tarda demasiado", "prueba con menos objetos", "Calculo cancelado tras 90 s. Prueba otro metodo o baja el numero de objetos.");
         return;
     }
     char buf[48];

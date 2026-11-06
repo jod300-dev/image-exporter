@@ -116,6 +116,12 @@ Que cambio:
 * **Calidad de busqueda:** por defecto *Alto* (antes *Normal*), nuevo nivel *Maximo*, y con 3.000 objetos o menos se sube un nivel solo (sobra tiempo). *Alto* aporta ~+0,9 dB y +0,02 SSIM frente a *Normal* por ~1,7x de tiempo; con 10.000 objetos el 7 y el 8 tardan hasta ~5 s en una imagen de 512 px.
 * Sin cambios apreciables: Cuadricula (ya es el promedio exacto), Regiones.
 
+## Correcciones tras la primera prueba en el juego
+
+* **La Piramide de capas se quedaba en un % para siempre** con imagenes transparentes y pocos objetos (un sprite con mucho borde). Los bordes obligaban a un minimo de objetos que no dependia del umbral, y ese minimo superaba el presupuesto; el bucle de seguridad subia el umbral sin fin. Ahora las celdas mixtas (parte opaca, parte transparente) se tratan por mayoria cuando el minimo no cabe, como hace el BSP, y todos los bucles de seguridad tienen tope. Se reprodujo antes de arreglarlo (cuelgue con 1.500, 3.000 y 6.000 objetos) y se comprobo despues con 500, 1.500, 3.000 y 10.000 en los 4 modos de color.
+* **Aviso de seguridad:** si un calculo pasa de 90 s se cancela y la ventana lo dice.
+* **Interfaz:** la descripcion se salia de la ventana (ahora se mide el texto y se parte en lineas a mano), las pestanas tapaban el titulo (son mas pequenas), y *Ajustes* quedaba fuera del marco (ahora *Ajustes* e *i* estan arriba a la derecha).
+
 ## Estructura
 
 ```

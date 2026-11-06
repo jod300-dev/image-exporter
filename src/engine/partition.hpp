@@ -186,6 +186,7 @@ struct PyrCtx {
     size_t budget = 0, count = 0;
     bool record = false, abort = false;
     std::vector<Shape>* out = nullptr;
+    int mixSize = 1;                     // celdas mixtas (opaco+transparente) de hasta este lado se tratan por mayoría, como en BSP
 };
 struct VisCol { double r = 0, g = 0, b = 0; bool has = false; };
 
@@ -204,7 +205,12 @@ inline void pyrVisit(PyrCtx& c, const Rect& node, VisCol vis, int level) {
             Rect k{xs[i], ys[j], xs[i + 1], ys[j + 1]};
             auto q = c.st->query(k.x0, k.y0, k.x1, k.y1);
             if (q.n == 0) continue;                               // vacío
-            if (q.n < q.area) { pyrVisit(c, k, vis, level + 1); if (c.abort) return; continue; } // mezcla opaco/transparente: dividir sin pintar
+            if (q.n < q.area) {                                    // mezcla opaco/transparente
+                if (std::max(k.x1 - k.x0, k.y1 - k.y0) > c.mixSize) { pyrVisit(c, k, vis, level + 1); if (c.abort) return; continue; }   // dividir sin pintar
+                if (q.n * 2 < q.area) continue;                    // casi transparente y ya pequeña: se omite
+                // casi opaca y pequeña: se pinta como un bloque opaco (sin esto, un sprite con mucho borde
+                // necesitaría más objetos que el presupuesto aunque se suba el umbral al máximo)
+            }
             double mr = q.sr / q.n, mg = q.sg / q.n, mb = q.sb / q.n;
             double within = q.sq - (q.sr * q.sr + q.sg * q.sg + q.sb * q.sb) / q.n;   // error interno
             if (within < 0) within = 0;
@@ -228,8 +234,8 @@ inline void pyrVisit(PyrCtx& c, const Rect& node, VisCol vis, int level) {
         }
 }
 
-inline size_t pyrRun(const Stats& st, double lam, size_t budget, bool record, std::vector<Shape>* out) {
-    PyrCtx c; c.st = &st; c.lam = lam; c.budget = budget; c.record = record; c.out = out;
+inline size_t pyrRun(const Stats& st, double lam, size_t budget, bool record, std::vector<Shape>* out, int mixSize = 1) {
+    PyrCtx c; c.st = &st; c.lam = lam; c.budget = budget; c.record = record; c.out = out; c.mixSize = mixSize;
     Rect root{0, 0, st.w, st.h};
     auto q = st.query(root.x0, root.y0, root.x1, root.y1);
     VisCol vis;
@@ -247,29 +253,36 @@ inline std::vector<Shape> pyramidShapes(const Image& raster, int budget, int alp
     Stats st; st.build(raster, alphaThr);
     size_t B = size_t(std::max(1, budget));
     double lo = 0.5, hi = 3.0 * 255 * 255 * double(raster.w) * raster.h;
-    if (pyrRun(st, lo, B, false, nullptr) <= B) hi = lo;         // cabe incluso sin pérdida
+
+    // Con transparencia, los bordes exigen un mínimo de objetos que no depende del umbral. Si ese mínimo no cabe,
+    // se agranda el tamaño mínimo de las celdas mixtas hasta que quepa (como el BSP, que decide por mayoría).
+    int mixSize = 1;
+    const int maxSide = std::max(raster.w, raster.h);
+    while (mixSize < maxSide && pyrRun(st, hi, B, false, nullptr, mixSize) > B) mixSize *= 2;
+
+    if (pyrRun(st, lo, B, false, nullptr, mixSize) <= B) hi = lo;   // cabe incluso sin pérdida
     else {
         for (int it = 0; it < 44 && hi / lo > 1.004; ++it) {
             double mid = std::sqrt(lo * hi);
-            if (pyrRun(st, mid, B, false, nullptr) <= B) hi = mid; else lo = mid;
+            if (pyrRun(st, mid, B, false, nullptr, mixSize) <= B) hi = mid; else lo = mid;
             report(prog, 0.5f * float(it + 1) / 44.f);
             if (isCancelled(prog)) break;
         }
-        while (pyrRun(st, hi, B, false, nullptr) > B) hi *= 1.02;  // seguridad
+        for (int g = 0; g < 400 && pyrRun(st, hi, B, false, nullptr, mixSize) > B; ++g) hi *= 1.05;   // seguridad (acotada)
     }
     // Segunda fase: los bloques padre totalmente tapados por sus hijos no se ven. Se cuentan solo las formas
     // visibles, así que se puede bajar lambda (más detalle) hasta llenar el presupuesto de verdad.
     auto visible = [&](double lam, std::vector<Shape>* keep) {
         std::vector<Shape> v;
-        pyrRun(st, lam, B * 2, true, &v);
+        pyrRun(st, lam, B * 2, true, &v, mixSize);
         refitVisible(v, raster, alphaThr, true);
         size_t n = v.size();
         if (keep) *keep = std::move(v);
         return n;
     };
-    if (hi > lo) {
+    if (hi > lo && !isCancelled(prog)) {
         double top = hi, bot = hi * 0.25;
-        while (visible(bot, nullptr) <= B && bot > lo) { top = bot; bot *= 0.5; }      // cota inferior que ya no cabe
+        for (int g = 0; g < 40 && visible(bot, nullptr) <= B && bot > lo; ++g) { top = bot; bot *= 0.5; }   // cota inferior que ya no cabe
         if (bot < lo) bot = lo;
         for (int it = 0; it < 13 && top / bot > 1.01; ++it) {
             double mid = std::sqrt(top * bot);
@@ -281,7 +294,8 @@ inline std::vector<Shape> pyramidShapes(const Image& raster, int budget, int alp
     }
     std::vector<Shape> out;
     visible(hi, &out);
-    while (out.size() > B) { hi *= 1.03; visible(hi, &out); }       // seguridad
+    for (int g = 0; g < 200 && out.size() > B; ++g) { hi *= 1.03; visible(hi, &out); }     // seguridad (acotada)
+    if (out.size() > B) out.resize(B);                                                      // último recurso: nunca pasa del presupuesto
     return out;
 }
 

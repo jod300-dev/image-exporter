@@ -27,6 +27,7 @@ protected:
         gdx::Method method = gdx::Method::BSP;
         gdx::Options opt;
         int id = 0;
+        double startMs = 0;                       // para el aviso de seguridad si tarda demasiado
         gdx::Result result;
         std::atomic<bool> done{false};
     };
@@ -62,6 +63,7 @@ protected:
     void applyResult(std::shared_ptr<Job> job);
     void buildPreview();
     void setStatus(std::string const& a, std::string const& b = "", std::string const& note = "");
+    std::string wrapText(std::string const& text, float scale, float maxWidth);   // parte el texto en líneas que caben en maxWidth
     gdx::Options makeOptions() const;
     gdx::GdExportOptions makeExportOptions() const;
     CCPoint placementOrigin() const;
@@ -101,6 +103,7 @@ protected:
     CCLabelBMFont* m_statA = nullptr;
     CCLabelBMFont* m_statB = nullptr;
     CCLabelBMFont* m_noteLabel = nullptr;
+    Ref<CCLabelBMFont> m_measure;                                        // etiqueta invisible para medir texto y partir líneas
     CCNode* m_previewHolder = nullptr;
     CCSprite* m_preview = nullptr;
 };

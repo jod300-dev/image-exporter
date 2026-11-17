@@ -59,6 +59,10 @@ Pensados para ser **ligeros**: tinta negra (canal 1010) sobre papel blanco (cana
 Cada estilo tiene una separacion minima visible, asi que **con 10.000 de limite suelen usar bastantes menos** (sombreado cruzado ~2.000, grabado ~4.600-6.500, ASCII ~150).
 Ajustes utiles: *Tinta blanca sobre fondo negro*, *Canal negro/blanco*, *ASCII: ancho de caracter* y *ASCII: alto/ancho de caracter*.
 
+### Diagnostico de la interfaz (v1.1.1)
+
+Si la ventana se ve con errores, activa en Ajustes **"Guardar diagnostico de la interfaz (txt)"**. Al abrir la ventana (y cada vez que se calcula una imagen) el mod escribe `ui-dump.txt` en su carpeta de guardado; la ruta exacta aparece en una notificacion. El txt incluye la version, el tamano de pantalla y el factor de escala, la posicion/ancla/tamano/escala y la **caja real en pantalla** de cada elemento, los **solapes** entre textos y botones, lo que se **sale del marco**, el estado del mod y los datos del ultimo resultado (por ejemplo cuantas formas sobresalen de la imagen). Enviando ese archivo se puede ver con exactitud como genera GD la ventana.
+
 ### Canales de color, grises y "Estilos ligeros" en color
 
 **Nada de triggers.** Los colores se escriben directamente en los ajustes de color del nivel (lo que lee el selector *Base Color* del editor) y cada objeto solo lleva su canal (`21,<canal>`): sin HSV y sin objetos extra.

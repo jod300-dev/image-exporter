@@ -94,6 +94,37 @@ private:
     int tx = 0, ty = 0;
     std::vector<double> tileErr;
 
+    // Semiextensiones (en x e y) de la caja que envuelve al rectangulo girado.
+    static void extents(const Cand& c, double& ex, double& ey) {
+        const double rad = c.rot * 3.14159265358979323846 / 180.0, cs = std::cos(rad), sn = std::sin(rad);
+        const double hx = c.w * 0.5, hy = c.h * 0.5;
+        ex = std::abs(hx * cs) + std::abs(hy * sn);
+        ey = std::abs(hx * sn) + std::abs(hy * cs);
+    }
+
+    // En GD el objeto se coloca ENTERO y no se puede recortar: un rectangulo girado que cruce el borde de la
+    // imagen deja "restos" fuera del cuadro. Por eso el rectangulo debe caber siempre dentro de la imagen.
+    bool fits(const Cand& c) const {
+        double ex, ey; extents(c, ex, ey);
+        constexpr double eps = 0.02;
+        return c.cx - ex >= -eps && c.cx + ex <= W + eps && c.cy - ey >= -eps && c.cy + ey <= H + eps;
+    }
+
+    // Encoge (si hace falta) y empuja el rectangulo hacia dentro hasta que quepa.
+    void fitCand(Cand& c) const {
+        double ex, ey; extents(c, ex, ey);
+        double sc = 1.0;
+        if (ex * 2.0 > W) sc = std::min(sc, double(W) / (ex * 2.0));
+        if (ey * 2.0 > H) sc = std::min(sc, double(H) / (ey * 2.0));
+        if (sc < 1.0) {
+            sc *= 0.999;
+            c.w = std::max(0.1f, float(c.w * sc)); c.h = std::max(0.1f, float(c.h * sc));
+            extents(c, ex, ey);
+        }
+        c.cx = float(std::min(std::max(double(c.cx), ex), std::max(ex, double(W) - ex)));
+        c.cy = float(std::min(std::max(double(c.cy), ey), std::max(ey, double(H) - ey)));
+    }
+
     void recomputeAll() {
         std::fill(tileErr.begin(), tileErr.end(), 0.0);
         for (int y = 0; y < H; ++y)
@@ -128,6 +159,7 @@ private:
     }
 
     Ev eval(const Cand& c) const {
+        if (!fits(c)) return Ev{};                                   // gain = -1e300: nunca se elige
         double n = 0, sr = 0, sg = 0, sb = 0, stt = 0, se = 0;
         forSpans(c, [&](int y, int xs, int xe) {
             const Px* p = &px[size_t(y) * W + xs];
@@ -173,6 +205,7 @@ private:
         float lmin = std::log(minS), lmax = std::log(maxS);
         c.w = std::exp(rng.range(lmin, lmax)); c.h = std::exp(rng.range(lmin, lmax));
         c.rot = rng.range(0.f, 180.f);
+        fitCand(c);
         return c;
     }
 
@@ -186,6 +219,7 @@ private:
         }
         c.cx = std::clamp(c.cx, 0.f, float(W)); c.cy = std::clamp(c.cy, 0.f, float(H));
         c.w = std::min(c.w, 2.f * L); c.h = std::min(c.h, 2.f * L);
+        fitCand(c);
         return c;
     }
 };
@@ -236,6 +270,27 @@ inline double hybridFractionFor(const Options& o) {
     return o.hybridFraction > 0 ? double(o.hybridFraction) : 0.15;
 }
 
+// Red de seguridad: ninguna forma puede sobresalir de la imagen (ver Geo::fits). Si alguna lo hiciera,
+// se encoge alrededor de su centro (y se empuja hacia dentro) hasta que quepa.
+inline int keepShapesInside(std::vector<Shape>& shapes, int W, int H) {
+    int fixed = 0;
+    for (auto& s : shapes) {
+        const double rad = s.rot * 3.14159265358979323846 / 180.0, cs = std::cos(rad), sn = std::sin(rad);
+        const double hx = s.w * 0.5, hy = s.h * 0.5;
+        double ex = std::abs(hx * cs) + std::abs(hy * sn), ey = std::abs(hx * sn) + std::abs(hy * cs);
+        const double eps = 0.02;
+        if (s.cx - ex >= -eps && s.cx + ex <= W + eps && s.cy - ey >= -eps && s.cy + ey <= H + eps) continue;
+        double sc = 1.0;
+        if (ex * 2.0 > W) sc = std::min(sc, double(W) / (ex * 2.0));
+        if (ey * 2.0 > H) sc = std::min(sc, double(H) / (ey * 2.0));
+        if (sc < 1.0) { sc *= 0.999; s.w = std::max(0.1f, float(s.w * sc)); s.h = std::max(0.1f, float(s.h * sc)); ex *= sc; ey *= sc; }
+        s.cx = float(std::min(std::max(double(s.cx), ex), std::max(ex, double(W) - ex)));
+        s.cy = float(std::min(std::max(double(s.cy), ey), std::max(ey, double(H) - ey)));
+        ++fixed;
+    }
+    return fixed;
+}
+
 // hybridBase = 0 -> Geometrize (con una base BSP gruesa del 6 %); > 0 -> fracción del presupuesto para la base BSP
 // Tras generar las formas se recolorean con lo que realmente queda visible, se eliminan las que otras
 // tapan por completo y ese presupuesto se reinvierte en más formas (hasta 3 rondas).
@@ -283,6 +338,7 @@ inline std::vector<Shape> geometrizeShapes(const Image& src, const Options& o, d
         auto extra = geo.run(freed, zNext, quality, prog, 0.65f + 0.1f * round, 0.1f);
         shapes.insert(shapes.end(), extra.begin(), extra.end());
     }
+    keepShapesInside(shapes, W, H);
     refitVisible(shapes, target, 255, true);
     if (int(shapes.size()) > budget) shapes.resize(size_t(budget));
     return shapes;

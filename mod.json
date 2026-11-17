@@ -8,7 +8,7 @@
 	},
 	"id": "patasma.image_exporter",
 	"name": "Image Exporter",
-	"version": "v1.1.0",
+	"version": "v1.1.1",
 	"developer": "Patasma",
 	"description": "Importa imagenes al editor con 8 metodos y 9 estilos monocromos ligeros (max. 10.000 objetos).",
 	"resources": {
@@ -174,6 +174,16 @@
 			"max": 100,
 			"name": "ASCII: espaciado de letras",
 			"description": "Espaciado entre caracteres de los objetos de texto (clave 488). Dejalo en 0 salvo que las letras salgan separadas o pegadas."
+		},
+		"title-debug": {
+			"name": "Diagnostico",
+			"type": "title"
+		},
+		"dump-ui": {
+			"type": "bool",
+			"default": false,
+			"name": "Guardar diagnostico de la interfaz (txt)",
+			"description": "Escribe <cy>ui-dump.txt</c> en la carpeta de guardado del mod cada vez que abres la ventana (y al calcular una imagen): posicion, tamano y escala reales de cada elemento, solapes y lo que se sale del marco. La ruta aparece en una notificacion al abrir la ventana. Mandame ese txt para arreglar la interfaz."
 		}
 	},
 	"tags": [

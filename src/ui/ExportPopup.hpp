@@ -55,6 +55,8 @@ protected:
     void stepMethod(int dir);
     gdx::Method effectiveMethod() const;
     void refreshLabels();
+    void dumpUi(float = 0.f);                                            // ajuste "dump-ui": escribe ui-dump.txt con el arbol de nodos
+    std::string dumpHeader() const;
 
     void loadImageBytes(std::vector<uint8_t> const& bytes);
     void scheduleRecompute();
@@ -77,6 +79,7 @@ protected:
     int m_jobCounter = 0;
     gdx::Result m_result;
     bool m_hasResult = false;
+    bool m_dumpNotified = false;       // la notificacion con la ruta del txt solo sale la primera vez
 
     int m_tab = 0;               // 0 principales (1-8), 1 ligeros (9-18)
     int m_method = 2;            // método principal (0..7); BSP por defecto

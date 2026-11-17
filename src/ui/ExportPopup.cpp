@@ -1,10 +1,13 @@
 #include "ExportPopup.hpp"
+#include "UiDump.hpp"
 
 #include <Geode/ui/GeodeUI.hpp>
 #include <Geode/ui/Notification.hpp>
 #include <Geode/utils/file.hpp>
 #include <Geode/utils/async.hpp>
 #include <thread>
+#include <ctime>
+#include <sstream>
 
 #define STBI_NO_STDIO
 #include "stb_image.h"
@@ -174,6 +177,8 @@ bool ExportPopup::init(EditorUI* editor) {
 
     this->schedule(schedule_selector(ExportPopup::tick), 0.1f);
     this->setTab(m_tab);                       // aplica pestaña, etiquetas y visibilidad
+    // Diagnostico de la interfaz (ajuste "dump-ui"): 1 s despues, cuando ya termino la animacion de entrada y las cajas son las finales
+    if (mod->getSettingValue<bool>("dump-ui")) this->scheduleOnce(schedule_selector(ExportPopup::dumpUi), 1.0f);
     return true;
 }
 
@@ -261,6 +266,99 @@ void ExportPopup::onColorToggle(CCObject*) {
 
 void ExportPopup::onSettings(CCObject*) {
     openSettingsPopup(Mod::get());
+}
+
+// ------------------------------------------------------- diagnostico de UI ---
+
+// Cabecera del txt: version, pantalla, estado del mod y datos del resultado (incluye cuantas formas sobresalen de la imagen).
+std::string ExportPopup::dumpHeader() const {
+    auto* mod = Mod::get();
+    std::ostringstream h;
+    h << std::fixed << std::setprecision(2);
+    std::time_t now = std::time(nullptr);
+    char tbuf[48] = "";
+    std::strftime(tbuf, sizeof tbuf, "%Y-%m-%d %H:%M:%S", std::localtime(&now));
+    h << "=== Image Exporter :: diagnostico de interfaz ===\n";
+    h << "fecha: " << tbuf << "\n";
+    h << "mod: " << mod->getVersion().toVString() << "   geode: " << Loader::get()->getVersion().toVString()
+      << "   gd: " << Loader::get()->getGameVersion() << "   plataforma: " << GEODE_PLATFORM_NAME << "\n";
+
+    auto* dir = CCDirector::get();
+    CCSize win = dir->getWinSize(), winPx = dir->getWinSizeInPixels();
+    h << "winSize: " << win.width << "x" << win.height << "   winSizePixels: " << winPx.width << "x" << winPx.height
+      << "   contentScaleFactor: " << dir->getContentScaleFactor() << "\n";
+    if (auto* view = dir->getOpenGLView()) {
+        CCSize fs = view->getFrameSize();
+        h << "ventana del juego (frame): " << fs.width << "x" << fs.height << "\n";
+    }
+
+    auto info = [&](char const* name, CCNode* n) {
+        if (!n) { h << name << ": (null)\n"; return; }
+        CCSize s = n->getContentSize(); CCPoint p = n->getPosition(), a = n->getAnchorPoint();
+        h << name << ": tam=" << s.width << "x" << s.height << " pos=(" << p.x << "," << p.y << ") ancla=(" << a.x << "," << a.y
+          << ") escala=" << n->getScaleX() << "," << n->getScaleY() << "\n";
+    };
+    h << "popup nominal: " << kPopupW << "x" << kPopupH << "\n";
+    info("m_mainLayer", m_mainLayer);
+    info("m_buttonMenu", m_buttonMenu);
+
+    h << "\n=== ESTADO DEL MOD ===\n";
+    h << "pestana=" << m_tab << " metodo=" << m_method << " estilo=" << m_style << " modoPrincipal=" << m_mainMode
+      << " coloresCanales=" << int(m_colorCheck) << " objetos=" << m_budget << " ladoLargo=" << m_sizeU << "u\n";
+    h << "metodo efectivo: " << gdx::methodInfo(effectiveMethod()).name << "\n";
+    h << "ajustes: calidad=" << mod->getSettingValue<std::string>("quality") << " max-raster=" << mod->getSettingValue<int>("max-raster")
+      << " umbral-alfa=" << mod->getSettingValue<int>("alpha-threshold") << " bleed=" << mod->getSettingValue<double>("bleed")
+      << " invertir-giro=" << int(mod->getSettingValue<bool>("flip-rotation")) << "\n";
+    auto text = [&](char const* name, CCLabelBMFont* l) { h << name << ": \"" << (l && l->getString() ? l->getString() : "") << "\"\n"; };
+    text("etiqueta metodo", m_methodLabel);
+    text("etiqueta descripcion", m_descLabel);
+    text("estado A", m_statA);
+    text("estado B", m_statB);
+    text("nota", m_noteLabel);
+
+    h << "\n=== IMAGEN Y RESULTADO ===\n";
+    if (m_image) h << "imagen original: " << m_image->w << "x" << m_image->h << "\n"; else h << "imagen original: (ninguna)\n";
+    if (m_hasResult) {
+        int outside = 0, rotated = 0; double worst = 0;
+        for (auto const& s : m_result.shapes) {
+            double rad = s.rot * 3.14159265358979323846 / 180.0, cs = std::cos(rad), sn = std::sin(rad), hx = s.w * 0.5, hy = s.h * 0.5;
+            double ex = std::abs(hx * cs) + std::abs(hy * sn), ey = std::abs(hx * sn) + std::abs(hy * cs);
+            double ov = std::max({0.0, ex - s.cx, s.cx + ex - m_result.rasterW, ey - s.cy, s.cy + ey - m_result.rasterH});
+            if (std::fmod(std::abs(s.rot), 90.0) > 1e-3) ++rotated;
+            if (ov > 0.05) { ++outside; worst = std::max(worst, ov); }
+        }
+        h << "formas=" << m_result.shapes.size() << " filasTexto=" << m_result.textRows.size() << " raster=" << m_result.rasterW << "x"
+          << m_result.rasterH << " aspecto=" << m_result.aspect << " psnr=" << m_result.psnr << " ms=" << m_result.ms << "\n";
+        h << "tieneTransparencia=" << int(m_result.hadAlpha) << " mono=" << int(m_result.mono) << " conCanales=" << int(m_result.colored)
+          << " girados=" << rotated << "\n";
+        h << "formas que SOBRESALEN de la imagen: " << outside << " (peor: " << worst << " px del raster)\n";
+        h << "nota del motor: \"" << m_result.note << "\"\n";
+    } else {
+        h << "(todavia no hay resultado)\n";
+    }
+    return h.str();
+}
+
+// Escribe <carpeta de guardado del mod>/ui-dump.txt. Solo actua con el ajuste "Guardar diagnostico de la interfaz" activo.
+void ExportPopup::dumpUi(float) {
+    auto* mod = Mod::get();
+    if (!mod->getSettingValue<bool>("dump-ui")) return;
+    std::string text;
+    try {
+        text = uidump::dumpTree(this, m_mainLayer, dumpHeader());
+    } catch (...) {
+        text = "Error interno al generar el diagnostico.\n";
+    }
+    auto path = mod->getSaveDir() / "ui-dump.txt";
+    auto res = utils::file::writeString(path, text);
+    std::string shown = utils::string::pathToString(path);
+    if (res.isOk()) log::info("Diagnostico de interfaz guardado en {}", shown);
+    else log::error("No se pudo guardar el diagnostico de interfaz en {}", shown);
+    if (!m_dumpNotified) {
+        m_dumpNotified = true;
+        if (res.isOk()) Notification::create("Diagnostico guardado en:\n" + shown, NotificationIcon::Success, 6.f)->show();
+        else Notification::create("No se pudo guardar el diagnostico:\n" + shown, NotificationIcon::Error, 6.f)->show();
+    }
 }
 
 // ------------------------------------------------------------ cargar imagen --
@@ -417,6 +515,7 @@ void ExportPopup::applyResult(std::shared_ptr<Job> job) {
     else std::snprintf(b1, sizeof b1, "%.1f s", m_result.ms / 1000.0);
     this->setStatus(a1, b1, m_result.note);
     this->buildPreview();
+    this->dumpUi();                                   // (solo si el ajuste esta activo) refresca el txt con el estado y el resultado
 }
 
 void ExportPopup::buildPreview() {

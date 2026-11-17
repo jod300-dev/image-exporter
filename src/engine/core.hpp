@@ -15,6 +15,22 @@
 
 namespace gdx {
 
+// Canales de color que el mod puede usar para repartir colores: 2..999 y, al acabarse esos, 1020..9999.
+// El 1 nunca (es el de los objetos por defecto) y 1000..1019 tampoco: ahi viven los canales especiales de GD
+// (BG, G1, G2, linea, 3DL, objeto, P1, P2, negro 1010, blanco 1011...), que no se deben tocar.
+constexpr int kChanLowMax = 999;            // fin del tramo bajo (2..999)
+constexpr int kChanHighMin = 1020;          // primer canal del tramo alto (1020..9999)
+constexpr int kChanMax = 9999;              // ultimo canal de color de GD 2.2
+constexpr int kChanPool = (kChanLowMax - 2 + 1) + (kChanMax - kChanHighMin + 1);   // 998 + 8980 = 9978 canales utilizables
+
+inline bool isUsableChannel(int c) { return (c >= 2 && c <= kChanLowMax) || (c >= kChanHighMin && c <= kChanMax); }
+// Siguiente canal utilizable tras `c` (salta 1000..1019). Devuelve kChanMax + 1 al terminar.
+inline int nextUsableChannel(int c) {
+    ++c;
+    if (c > kChanLowMax && c < kChanHighMin) c = kChanHighMin;
+    return c;
+}
+
 // ---------------------------------------------------------------- tipos ----
 
 struct Image {
@@ -77,7 +93,7 @@ struct Options {
     bool grayscale = false;              // escala de grises (con HSV o con canales según mainChannels)
     int mainPaletteSize = 64;            // canales de la paleta de los métodos principales
     // ---- canales disponibles ----
-    int maxChannels = 997;               // canales libres que puede usar este resultado (el 1 nunca; lo fija la ventana)
+    int maxChannels = 997;               // canales libres que puede usar este resultado (2..999 y 1020..9999; el 1 nunca; lo fija la ventana)
 };
 
 // Una fila de arte ASCII: se exporta como UN objeto de texto de GD.

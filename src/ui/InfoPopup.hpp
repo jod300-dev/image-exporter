@@ -37,7 +37,7 @@ protected:
         std::vector<Para> paras = {
             {"Principales (1-8): rectangulos de color, max. 10.000 objetos.", yellow},
             {"BSP para fotos, Regiones para ilustraciones y pixel art, Hibrido para la maxima calidad.", white},
-            {"Sin marcar = HSV a color. Canales reparte los colores en canales libres (nunca el 1). Gris usa escala de grises.", white},
+            {"Sin marcar = HSV a color. Canales reparte los colores en canales libres (2-999 y luego 1020 en adelante; nunca el 1). Gris usa escala de grises.", white},
             {"Ligeros (9-18): menos objetos y sin HSV. Con Colores en canales salen a color.", yellow},
             {"El ASCII usa texto: pon una fuente monoespaciada en el nivel y calibra el ancho de caracter en Ajustes.", white},
             {"Con un objeto seleccionado la imagen se centra en el; si no, en la vista.", white},

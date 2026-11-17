@@ -705,7 +705,7 @@ void ExportPopup::applyChannelColorsDirect(gdx::GdExportOptions const& eo, gdx::
         managers.push_back(lel->m_levelSettings->m_effectManager);
     }
     for (size_t i = 0; i < cmap.colors.size(); ++i) {
-        int channel = gdx::channelForIndex(eo, int(i));               // 2..999, nunca el 1
+        int channel = gdx::channelForIndex(eo, int(i));               // 2..999 y 1020..9999, nunca el 1
         ccColor3B c = {cmap.colors[i][0], cmap.colors[i][1], cmap.colors[i][2]};
         for (auto* mgr : managers) {
             auto* action = mgr->getColorAction(channel);
@@ -770,10 +770,11 @@ void ExportPopup::onPlace(CCObject*) {
         m_editor->selectObjects(created, true);
     }
 
-    char msg[96];
+    char msg[128];
     if (m_result.colored && !eo.channels.empty()) {
         int lo = *std::min_element(eo.channels.begin(), eo.channels.end()), hi = *std::max_element(eo.channels.begin(), eo.channels.end());
-        std::snprintf(msg, sizeof msg, "Imagen colocada: %zu objetos | canales %d-%d", count, lo, hi);
+        if (lo <= gdx::kChanLowMax && hi >= gdx::kChanHighMin) std::snprintf(msg, sizeof msg, "Imagen colocada: %zu objetos | canales %d-%d y %d-%d", count, lo, gdx::kChanLowMax, gdx::kChanHighMin, hi);
+        else std::snprintf(msg, sizeof msg, "Imagen colocada: %zu objetos | canales %d-%d", count, lo, hi);
     } else {
         std::snprintf(msg, sizeof msg, "Imagen colocada: %zu objetos", count);
     }

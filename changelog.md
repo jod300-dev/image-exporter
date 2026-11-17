@@ -23,3 +23,6 @@
 - Ajustes pasa abajo a la izquierda, en la misma fila y con el mismo tamano que Imagen y Colocar.
 - El boton de info abre un cuadro propio (400x250, sin scroll): texto partido a mano, alineado a la izquierda, con colores por parrafo y el boton OK siempre visible. Ya no se sale de la pantalla ni recorta lineas.
 - Diagnostico de UI (ajuste "Guardar diagnostico de la interfaz"): ahora vuelca TODO. Escena completa y arbol entero de cada ventana abierta (mod, info, ajustes de Geode, avisos), con posicion, ancla, tamano, escala, sesgo, rotacion, color, opacidad, hijos y caja real en pantalla; textos literales con sus bytes, glifos que la fuente no tiene, numero de lineas y separacion real entre lineas; resumen de textos y de botones; solapes y desbordes. Guarda una instantanea al abrir la ventana, al cambiar de pestana, al abrir info, al abrir ajustes y al calcular, todas en el mismo ui-dump.txt.
+
+# v1.1.5
+- Canales de color: al acabarse los canales 2-999 ya no se vuelve a HSV; el reparto continua en el 1020 y sigue hasta el 9999, saltando 1000-1019 (canales especiales de GD: BG, G1, G2, negro, blanco...). Hay hasta 9978 canales utilizables en vez de 998.

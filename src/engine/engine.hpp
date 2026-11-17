@@ -64,7 +64,7 @@ inline Result convert(const Image& srcIn, Method method, const Options& opt, Pro
     Options o = opt;
     o.budget = std::clamp(o.budget, 1, 80000);
     o.maxRaster = std::clamp(o.maxRaster, 32, 2048);
-    o.maxChannels = std::clamp(o.maxChannels, 0, 997);
+    o.maxChannels = std::clamp(o.maxChannels, 0, kChanPool);
     res.aspect = srcIn.h > 0 ? float(srcIn.w) / float(srcIn.h) : 1.f;
     if (srcIn.empty()) return res;
     res.hadAlpha = hasTransparency(srcIn, o.alphaThreshold);

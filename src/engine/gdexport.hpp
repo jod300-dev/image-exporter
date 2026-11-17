@@ -92,18 +92,20 @@ inline ChannelMap buildChannelMap(const Result& r) {
 }
 
 // Elige `need` canales libres: primero desde `start` hacia arriba, luego desde el 2 hasta `start`.
-// `used` son los canales que ya usa el nivel (objetos o colores definidos). Nunca el 1 ni los >= 1000.
+// El reparto recorre 2..999 y, al acabarse, sigue en 1020..9999 (se saltan 1000..1019, que son canales especiales de GD).
+// `used` son los canales que ya usa el nivel (objetos o colores definidos). Nunca el 1.
 inline std::vector<int> pickFreeChannels(const std::set<int>& used, int start, int need) {
     std::vector<int> out;
-    start = std::clamp(start, 2, 999);
-    for (int c = start; c <= 999 && int(out.size()) < need; ++c) if (!used.count(c)) out.push_back(c);
-    for (int c = 2; c < start && int(out.size()) < need; ++c) if (!used.count(c)) out.push_back(c);
+    start = std::clamp(start, 2, kChanMax);
+    if (!isUsableChannel(start)) start = kChanHighMin;               // si cae en 1000..1019 se continua en 1020
+    for (int c = start; c <= kChanMax && int(out.size()) < need; c = nextUsableChannel(c)) if (!used.count(c)) out.push_back(c);
+    for (int c = 2; c < start && int(out.size()) < need; c = nextUsableChannel(c)) if (!used.count(c)) out.push_back(c);
     return out;
 }
 
 inline int countFreeChannels(const std::set<int>& used) {
     int n = 0;
-    for (int c = 2; c <= 999; ++c) if (!used.count(c)) ++n;
+    for (int c = 2; c <= kChanMax; c = nextUsableChannel(c)) if (!used.count(c)) ++n;
     return n;
 }
 
@@ -131,10 +133,12 @@ inline std::string base64Encode(const std::string& in) {
     return out;
 }
 
-// Canal asignado al color de índice `idx` (nunca el 1).
+// Canal asignado al color de índice `idx` (nunca el 1 ni 1000..1019).
 inline int channelForIndex(const GdExportOptions& o, int idx) {
     int c = idx < int(o.channels.size()) ? o.channels[size_t(idx)] : o.paletteChannelStart + idx;
-    return std::clamp(c, 2, 999);
+    c = std::clamp(c, 2, kChanMax);
+    if (!isUsableChannel(c)) c = kChanHighMin + (c - kChanLowMax - 1);   // 1000 -> 1020, 1001 -> 1021...
+    return std::min(c, kChanMax);
 }
 
 inline std::string toGdString(const Result& r, const GdExportOptions& o) {

@@ -67,7 +67,7 @@ Si la ventana se ve con errores, activa en Ajustes **"Guardar diagnostico de la 
 
 **Nada de triggers.** Los colores se escriben directamente en los ajustes de color del nivel (lo que lee el selector *Base Color* del editor) y cada objeto solo lleva su canal (`21,<canal>`): sin HSV y sin objetos extra.
 
-**Canales libres.** Antes de colocar, el mod mira que canales usa el nivel (el color base y de detalle de **todos los objetos** y los colores ya definidos) y reparte los colores de la imagen **solo en canales libres**, empezando en *Primer canal de la paleta* (por defecto 2). **El canal 1 nunca se usa.** Al colocar una segunda imagen coge otros canales distintos, asi que **no sobrescribe** los colores de la anterior. Si no quedan suficientes, avisa y no coloca nada.
+**Canales libres.** Antes de colocar, el mod mira que canales usa el nivel (el color base y de detalle de **todos los objetos** y los colores ya definidos) y reparte los colores de la imagen **solo en canales libres**, empezando en *Primer canal de la paleta* (por defecto 2). Si se acaban los canales 2-999, el reparto **continua en el 1020 y sigue hasta el 9999** (los 1000-1019 son canales especiales de GD -BG, G1, G2, negro, blanco...- y no se usan). **El canal 1 nunca se usa.** Al colocar una segunda imagen coge otros canales distintos, asi que **no sobrescribe** los colores de la anterior. Si no quedan suficientes, avisa y no coloca nada.
 
 **Metodos 1-8: tres checks** (ninguno marcado = HSV a color, como siempre):
 * *Canales de color*: los colores se reducen a una paleta (por defecto 64, ajustable) y cada color es un canal.

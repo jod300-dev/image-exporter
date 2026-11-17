@@ -160,8 +160,8 @@ inline std::string dumpTree(CCNode* root, CCNode* frame, std::string const& head
             float ox = std::min(a.x1, b.x1) - std::max(a.x0, b.x0);
             float oy = std::min(a.y1, b.y1) - std::max(a.y0, b.y0);
             if (ox <= 1.f || oy <= 1.f) continue;
-            float area = ox * oy, small = std::min(aw * ah, bw * bh);
-            float pct = small > 0 ? 100.f * area / small : 0.f;
+            float area = ox * oy, minArea = std::min(aw * ah, bw * bh);     // (no llamar "small": es una macro de Windows)
+            float pct = minArea > 0 ? 100.f * area / minArea : 0.f;
             if (pct < 5.f) continue;
             char buf[400];
             std::snprintf(buf, sizeof buf, "[%zu] %s  <->  [%zu] %s : solape %.1fx%.1f (%.0f%% del menor)\n",

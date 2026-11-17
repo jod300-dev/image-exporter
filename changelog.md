@@ -9,3 +9,6 @@
 # v1.1.1
 - Metodos 7 y 8: los rectangulos girados ya no sobresalen del borde de la imagen (en GD no se pueden recortar y dejaban restos fuera del cuadro). La imagen queda como un cuadro limpio; la calidad (PSNR) casi no cambia.
 - Nuevo ajuste *Guardar diagnostico de la interfaz (txt)*: escribe ui-dump.txt con el arbol de nodos de la ventana (posicion, tamano, escala, caja real en pantalla), los solapes y lo que se sale del marco, mas el estado del mod y del resultado.
+
+# v1.1.2
+- Corregido el error de compilacion en Windows (una variable llamada "small" chocaba con una macro de Windows) y la advertencia de localtime.

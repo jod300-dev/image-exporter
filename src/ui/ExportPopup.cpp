@@ -277,7 +277,13 @@ std::string ExportPopup::dumpHeader() const {
     h << std::fixed << std::setprecision(2);
     std::time_t now = std::time(nullptr);
     char tbuf[48] = "";
-    std::strftime(tbuf, sizeof tbuf, "%Y-%m-%d %H:%M:%S", std::localtime(&now));
+    std::tm tmv{};
+#if defined(GEODE_IS_WINDOWS)
+    localtime_s(&tmv, &now);
+#else
+    localtime_r(&now, &tmv);
+#endif
+    std::strftime(tbuf, sizeof tbuf, "%Y-%m-%d %H:%M:%S", &tmv);
     h << "=== Image Exporter :: diagnostico de interfaz ===\n";
     h << "fecha: " << tbuf << "\n";
     h << "mod: " << mod->getVersion().toVString() << "   geode: " << Loader::get()->getVersion().toVString()

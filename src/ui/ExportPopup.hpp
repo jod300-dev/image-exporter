@@ -51,6 +51,7 @@ protected:
     void onMainGrayCh(CCObject*) { setMainMode(m_mainMode == 3 ? 0 : 3); }
 
     void setTab(int tab);
+    void syncToggles(float = 0.f);    // deja los botones tipo toggler como dicen m_tab / m_mainMode (ver comentario en el .cpp)
     void setMainMode(int mode);       // 0 HSV color (por defecto), 1 canales de color, 2 gris HSV, 3 gris canales
     void stepMethod(int dir);
     gdx::Method effectiveMethod() const;

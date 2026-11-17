@@ -17,40 +17,40 @@ struct MethodInfo { const char* name; const char* desc; bool slow; };
 
 inline const MethodInfo& methodInfo(Method m) {
     static const MethodInfo kInfo[int(Method::COUNT)] = {
-        {"1. Cuadricula uniforme",
-         "Una celda por objeto con el color medio. Rapido; ideal para pixel art.", false},
+        {"1. Cuadrícula uniforme",
+         "Una celda por objeto con el color medio. Rápido; ideal para pixel art.", false},
         {"2. Quadtree adaptativo",
-         "Divide en 4 solo donde hay detalle. Usa justo el limite de objetos.", false},
+         "Divide en 4 solo donde hay detalle. Usa justo el límite de objetos.", false},
         {"3. BSP adaptativo (k-d)",
-         "Cortes optimos en X o Y: rectangulos de cualquier forma. Muy bueno en fotos.", false},
-        {"4. Piramide de capas",
+         "Cortes óptimos en X o Y: rectángulos de cualquier forma. Muy bueno en fotos.", false},
+        {"4. Pirámide de capas",
          "Bloque grande y capas de detalle solo donde el color cambia. Ahorra objetos.", false},
         {"5. Regiones por paleta",
-         "Reduce la paleta y fusiona zonas iguales en rectangulos. Para ilustraciones.", false},
+         "Reduce la paleta y fusiona zonas iguales en rectángulos. Para ilustraciones.", false},
         {"6. Franjas horizontales",
-         "Tiras de color por filas o columnas con tolerancia. Estilo escaneo, muy rapido.", false},
-        {"7. Rectangulos rotados",
-         "Rectangulos girados por busqueda aleatoria (estilo Geometrize). Aspecto pictorico.", true},
-        {"8. Hibrido BSP + rotados",
-         "Base BSP mas rectangulos rotados sobre los residuos. Maxima calidad.", true},
+         "Tiras de color por filas o columnas con tolerancia. Estilo escaneo, muy rápido.", false},
+        {"7. Rectángulos rotados",
+         "Rectángulos girados por búsqueda aleatoria (estilo Geometrize). Aspecto pictórico.", true},
+        {"8. Híbrido BSP + rotados",
+         "Base BSP más rectángulos rotados sobre los residuos. Máxima calidad.", true},
         {"9. Halftone (diamantes)",
-         "Trama de periodico: diamantes cuyo tamano sigue la oscuridad. Sin HSV.", false},
-        {"10. Grabado de lineas",
-         "Lineas paralelas de grosor variable, como un grabado. Pocos objetos.", false},
+         "Trama de periódico: diamantes cuyo tamaño sigue la oscuridad. Sin HSV.", false},
+        {"10. Grabado de líneas",
+         "Líneas paralelas de grosor variable, como un grabado. Pocos objetos.", false},
         {"11. Sombreado cruzado",
-         "Capas de rayas a 45, 135, 0 y 90 grados segun la oscuridad. Sin HSV.", false},
+         "Capas de rayas a 45, 135, 0 y 90 grados según la oscuridad. Sin HSV.", false},
         {"12. Estarcido (puntos)",
-         "Nube de puntos mas densa donde la imagen es oscura (puntillismo).", false},
+         "Nube de puntos más densa donde la imagen es oscura (puntillismo).", false},
         {"13. Tramado Bayer",
-         "Blanco y negro con tramado ordenado, fusionado en rectangulos. Sin HSV.", false},
-        {"14. Tinta (comic)",
-         "Umbral adaptativo: manchas de tinta solidas, estilo comic. Muy pocos objetos.", false},
+         "Blanco y negro con tramado ordenado, fusionado en rectángulos. Sin HSV.", false},
+        {"14. Tinta (cómic)",
+         "Umbral adaptativo: manchas de tinta sólidas, estilo cómic. Muy pocos objetos.", false},
         {"15. Boceto de trazos",
-         "Trazos cortos orientados sobre los bordes, como un dibujo a lapiz.", false},
+         "Trazos cortos orientados sobre los bordes, como un dibujo a lápiz.", false},
         {"16. Espiral",
          "Una espiral cuyo grosor sigue la oscuridad de la imagen.", false},
         {"17. Diagonales 10 PRINT",
-         "Una diagonal / o \\ por celda segun la estructura local y el tono.", false},
+         "Una diagonal / o \\ por celda según la estructura local y el tono.", false},
         {"18. Arte ASCII (texto)",
          "Texto en objetos de texto: la imagen en pocos objetos. Pide fuente monoespaciada.", false},
     };
@@ -86,7 +86,7 @@ inline Result convert(const Image& srcIn, Method method, const Options& opt, Pro
     // con transparencia se usa BSP (que sí respeta los bordes) y se avisa.
     if (res.hadAlpha && (method == Method::Geometrize || method == Method::Hybrid)) {
         method = Method::BSP;
-        res.note = "Imagen con transparencia: se uso BSP (los rectangulos rotados no pueden dejar huecos).";
+        res.note = "Imagen con transparencia: se usó BSP (los rectángulos rotados no pueden dejar huecos).";
     }
 
     Image reference;            // raster contra el que se mide el PSNR

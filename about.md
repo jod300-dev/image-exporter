@@ -1,7 +1,7 @@
 # Image Exporter
 
-Importa una imagen al editor de Geometry Dash como **rectangulos de color**, con un maximo de **10.000 objetos**.
+Importa una imagen al editor de Geometry Dash como **rectángulos de color**, con un máximo de **10.000 objetos**.
 
-Elige entre 8 metodos distintos (cuadricula, quadtree, BSP, piramide de capas, regiones por paleta, franjas, rectangulos rotados e hibrido), ve una **vista previa** con el numero de objetos y la calidad, y colocala en el editor con un clic.
+Elige entre 8 métodos distintos (cuadrícula, quadtree, BSP, pirámide de capas, regiones por paleta, franjas, rectángulos rotados e híbrido), ve una **vista previa** con el número de objetos y la calidad, y colócala en el editor con un clic.
 
-Abre el editor, pestana **Edit** y pulsa el boton del mod.
+Abre el editor, pestaña **Edit** y pulsa el boton del mod.

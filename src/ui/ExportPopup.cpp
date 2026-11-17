@@ -22,9 +22,9 @@ namespace {
 
     int qualityFromSetting() {
         auto q = Mod::get()->getSettingValue<std::string>("quality");
-        if (q == "Rapido") return 0;
+        if (q == "Rápido" || q == "Rapido") return 0;
         if (q == "Normal") return 1;
-        if (q == "Maximo") return 3;
+        if (q == "Máximo" || q == "Maximo") return 3;
         return 2;                                  // Alto (por defecto)
     }
     // sliders: 0..1 <-> valor
@@ -103,15 +103,15 @@ bool ExportPopup::init(EditorUI* editor) {
     hint->setOpacity(120);
     hint->setPosition({kPrevSize / 2, kPrevSize / 2});
     m_previewHolder->addChild(hint);
-    put(m_previewHolder, 84.f, 108.f);
+    put(m_previewHolder, 84.f, 104.f);
 
-    m_statA = label("Elige una imagen", "chatFont.fnt", 0.85f, 84.f, 192.f);
-    m_statB = label("", "chatFont.fnt", 0.75f, 84.f, 206.f);
+    m_statA = label("Elige una imagen", "chatFont.fnt", 0.85f, 84.f, 186.f);
+    m_statB = label("", "chatFont.fnt", 0.75f, 84.f, 199.f);
     m_noteLabel = CCLabelBMFont::create("", "chatFont.fnt", 600.f, kCCTextAlignmentCenter);   // 600: nunca ajusta solo; se parte a mano
     m_noteLabel->setScale(0.6f);
     m_noteLabel->setColor({255, 200, 80});
     m_noteLabel->setAnchorPoint({0.5f, 1.f});                  // anclada arriba: si hay mas lineas crece hacia abajo sin pisar el estado
-    put(m_noteLabel, 84.f, 217.f);
+    put(m_noteLabel, 84.f, 210.f);
 
     // ============ columna derecha ============
     // pestañas
@@ -183,11 +183,12 @@ bool ExportPopup::init(EditorUI* editor) {
     putBtn(placeBtn, 327.f, 260.f);
     // Fila del titulo: Ajustes e info a la derecha, dentro del marco y sin tocar las pestanas.
     auto infoBtn = CCMenuItemSpriteExtra::create(CCSprite::createWithSpriteFrameName("GJ_infoIcon_001.png"), this, menu_selector(ExportPopup::onInfo));
-    putBtn(infoBtn, 408.f, 20.f);
-    auto setSpr = ButtonSprite::create("Ajustes", "bigFont.fnt", "GJ_button_04.png", 0.4f);
-    setSpr->setScale(0.62f);
+    putBtn(infoBtn, 408.f, 21.f);
+    // Ajustes: misma fila, mismo alto y mismo estilo de texto que Imagen / Colocar, centrado bajo la vista previa.
+    auto setSpr = ButtonSprite::create("Ajustes", "bigFont.fnt", "GJ_button_04.png", 0.52f);
+    setSpr->setScale(0.8f);
     auto setBtn = CCMenuItemSpriteExtra::create(setSpr, this, menu_selector(ExportPopup::onSettings));
-    putBtn(setBtn, 366.f, 21.f);
+    putBtn(setBtn, 84.f, 260.f);
 
     this->schedule(schedule_selector(ExportPopup::tick), 0.1f);
     this->setTab(m_tab);                       // aplica pestaña, etiquetas y visibilidad
@@ -202,10 +203,21 @@ gdx::Method ExportPopup::effectiveMethod() const {
     return m_tab == 1 ? gdx::Method(gdx::kNormalMethodCount + m_style) : gdx::Method(m_method);
 }
 
+// CCMenuItemToggler cambia su propio estado justo DESPUES de ejecutar el callback. Si el callback ya lo habia puesto como
+// queria, el toggler lo invierte y las dos pestanas quedaban grises (y los checks de Principales desincronizados).
+// Por eso el estado real se vuelve a aplicar en el siguiente frame, cuando el toggler ya termino de cambiar.
+void ExportPopup::syncToggles(float) {
+    m_tabMain->toggle(m_tab == 0);
+    m_tabLight->toggle(m_tab == 1);
+    m_chkChannels->toggle(m_mainMode == 1);
+    m_chkGrayHsv->toggle(m_mainMode == 2);
+    m_chkGrayCh->toggle(m_mainMode == 3);
+}
+
 void ExportPopup::setTab(int tab) {
     m_tab = tab;
-    m_tabMain->toggle(tab == 0);
-    m_tabLight->toggle(tab == 1);
+    this->syncToggles();
+    this->scheduleOnce(schedule_selector(ExportPopup::syncToggles), 0.f);
     for (auto* n : m_mainOpts) n->setVisible(tab == 0);
     for (auto* n : m_lightOpts) n->setVisible(tab == 1);
     this->refreshLabels();
@@ -265,9 +277,8 @@ void ExportPopup::onSizeSlider(CCObject* sender) {
 // Los tres checks de Principales funcionan como una selección única: ninguno = HSV a color.
 void ExportPopup::setMainMode(int mode) {
     m_mainMode = mode;
-    m_chkChannels->toggle(mode == 1);
-    m_chkGrayHsv->toggle(mode == 2);
-    m_chkGrayCh->toggle(mode == 3);
+    this->syncToggles();
+    this->scheduleOnce(schedule_selector(ExportPopup::syncToggles), 0.f);
     this->refreshLabels();
     if (m_tab == 0) this->scheduleRecompute();
 }
@@ -298,7 +309,7 @@ std::string ExportPopup::dumpHeader() const {
     localtime_r(&now, &tmv);
 #endif
     std::strftime(tbuf, sizeof tbuf, "%Y-%m-%d %H:%M:%S", &tmv);
-    h << "=== Image Exporter :: diagnostico de interfaz ===\n";
+    h << "=== Image Exporter :: diagnóstico de interfaz ===\n";
     h << "fecha: " << tbuf << "\n";
     h << "mod: " << mod->getVersion().toVString() << "   geode: " << Loader::get()->getVersion().toVString()
       << "   gd: " << Loader::get()->getGameVersion() << "   plataforma: " << GEODE_PLATFORM_NAME << "\n";
@@ -323,14 +334,14 @@ std::string ExportPopup::dumpHeader() const {
     info("m_buttonMenu", m_buttonMenu);
 
     h << "\n=== ESTADO DEL MOD ===\n";
-    h << "pestana=" << m_tab << " metodo=" << m_method << " estilo=" << m_style << " modoPrincipal=" << m_mainMode
+    h << "pestaña=" << m_tab << " método=" << m_method << " estilo=" << m_style << " modoPrincipal=" << m_mainMode
       << " coloresCanales=" << int(m_colorCheck) << " objetos=" << m_budget << " ladoLargo=" << m_sizeU << "u\n";
-    h << "metodo efectivo: " << gdx::methodInfo(effectiveMethod()).name << "\n";
+    h << "método efectivo: " << gdx::methodInfo(effectiveMethod()).name << "\n";
     h << "ajustes: calidad=" << mod->getSettingValue<std::string>("quality") << " max-raster=" << mod->getSettingValue<int>("max-raster")
       << " umbral-alfa=" << mod->getSettingValue<int>("alpha-threshold") << " bleed=" << mod->getSettingValue<double>("bleed")
       << " invertir-giro=" << int(mod->getSettingValue<bool>("flip-rotation")) << "\n";
     auto text = [&](char const* name, CCLabelBMFont* l) { h << name << ": \"" << (l && l->getString() ? l->getString() : "") << "\"\n"; };
-    text("etiqueta metodo", m_methodLabel);
+    text("etiqueta método", m_methodLabel);
     text("etiqueta descripcion", m_descLabel);
     text("estado A", m_statA);
     text("estado B", m_statB);
@@ -354,12 +365,12 @@ std::string ExportPopup::dumpHeader() const {
         h << "formas que SOBRESALEN de la imagen: " << outside << " (peor: " << worst << " px del raster)\n";
         h << "nota del motor: \"" << m_result.note << "\"\n";
     } else {
-        h << "(todavia no hay resultado)\n";
+        h << "(todavía no hay resultado)\n";
     }
     return h.str();
 }
 
-// Escribe <carpeta de guardado del mod>/ui-dump.txt. Solo actua con el ajuste "Guardar diagnostico de la interfaz" activo.
+// Escribe <carpeta de guardado del mod>/ui-dump.txt. Solo actua con el ajuste "Guardar diagnóstico de la interfaz" activo.
 void ExportPopup::dumpUi(float) {
     auto* mod = Mod::get();
     if (!mod->getSettingValue<bool>("dump-ui")) return;
@@ -367,17 +378,17 @@ void ExportPopup::dumpUi(float) {
     try {
         text = uidump::dumpTree(this, m_mainLayer, dumpHeader());
     } catch (...) {
-        text = "Error interno al generar el diagnostico.\n";
+        text = "Error interno al generar el diagnóstico.\n";
     }
     auto path = mod->getSaveDir() / "ui-dump.txt";
     auto res = utils::file::writeString(path, text);
     std::string shown = utils::string::pathToString(path);
-    if (res.isOk()) log::info("Diagnostico de interfaz guardado en {}", shown);
-    else log::error("No se pudo guardar el diagnostico de interfaz en {}", shown);
+    if (res.isOk()) log::info("Diagnóstico de interfaz guardado en {}", shown);
+    else log::error("No se pudo guardar el diagnóstico de interfaz en {}", shown);
     if (!m_dumpNotified) {
         m_dumpNotified = true;
-        if (res.isOk()) Notification::create("Diagnostico guardado en:\n" + shown, NotificationIcon::Success, 6.f)->show();
-        else Notification::create("No se pudo guardar el diagnostico:\n" + shown, NotificationIcon::Error, 6.f)->show();
+        if (res.isOk()) Notification::create("Diagnóstico guardado en:\n" + shown, NotificationIcon::Success, 6.f)->show();
+        else Notification::create("No se pudo guardar el diagnóstico:\n" + shown, NotificationIcon::Error, 6.f)->show();
     }
 }
 
@@ -386,7 +397,7 @@ void ExportPopup::dumpUi(float) {
 void ExportPopup::onPick(CCObject*) {
     auto options = file::FilePickOptions{
         std::nullopt,
-        {{"Imagenes", {"*.png", "*.jpg", "*.jpeg", "*.bmp", "*.tga", "*.gif"}}}
+        {{"Imágenes", {"*.png", "*.jpg", "*.jpeg", "*.bmp", "*.tga", "*.gif"}}}
     };
     async::spawn(
         file::pick(file::PickMode::OpenFile, options),
@@ -418,7 +429,7 @@ void ExportPopup::loadImageBytes(std::vector<uint8_t> const& bytes) {
     }
     if (int64_t(w) * h > 100000000) {
         stbi_image_free(d);
-        this->setStatus("Imagen demasiado grande", "(max. 100 megapixeles)");
+        this->setStatus("Imagen demasiado grande", "(máx. 100 megapíxeles)");
         return;
     }
     auto img = std::make_shared<gdx::Image>();
@@ -511,7 +522,7 @@ void ExportPopup::tick(float) {
     if (gdx::nowMs() - m_job->startMs > 90000.0) {
         m_job->prog.cancel.store(true);
         m_job = nullptr;
-        this->setStatus("Tarda demasiado", "prueba con menos objetos", "Calculo cancelado tras 90 s. Prueba otro metodo o baja el numero de objetos.");
+        this->setStatus("Tarda demasiado", "prueba con menos objetos", "Cálculo cancelado tras 90 s. Prueba otro método o baja el número de objetos.");
         return;
     }
     char buf[48];
@@ -523,7 +534,7 @@ void ExportPopup::applyResult(std::shared_ptr<Job> job) {
     m_result = std::move(job->result);
     m_hasResult = !m_result.shapes.empty() || !m_result.textRows.empty();
     if (!m_hasResult) {
-        this->setStatus("No se genero ningun objeto", "", m_result.note);
+        this->setStatus("No se generó ningún objeto", "", m_result.note);
         return;
     }
     // tamaño aproximado de la cadena de objetos (sin comprimir): sirve para comparar métodos
@@ -654,7 +665,7 @@ void ExportPopup::applyChannelColorsDirect(gdx::GdExportOptions const& eo, gdx::
 
 void ExportPopup::onPlace(CCObject*) {
     if (m_job) {
-        FLAlertLayer::create("Image Exporter", "Todavia se esta calculando. Espera a que termine.", "OK")->show();
+        FLAlertLayer::create("Image Exporter", "Todavía se está calculando. Espera a que termine.", "OK")->show();
         return;
     }
     if (!m_hasResult) {
@@ -678,7 +689,7 @@ void ExportPopup::onPlace(CCObject*) {
         std::vector<int> chosen = gdx::pickFreeChannels(used, eo.paletteChannelStart, need);
         if (int(chosen.size()) < need) {
             char buf[200];
-            std::snprintf(buf, sizeof buf, "No hay canales libres suficientes: hacen falta %d y quedan %d.\nUsa menos colores en los ajustes o libera canales.",
+            std::snprintf(buf, sizeof buf, "No hay suficientes canales libres: hacen falta %d y quedan %d.\nUsa menos colores en los ajustes o libera canales.",
                           need, int(chosen.size()));
             FLAlertLayer::create("Image Exporter", buf, "OK")->show();
             return;
@@ -710,13 +721,22 @@ void ExportPopup::onPlace(CCObject*) {
 }
 
 void ExportPopup::onInfo(CCObject*) {
+    // Ventana con scroll y alto fijo (240 < 320 de la pantalla de GD): el texto largo se desplaza dentro y el boton OK siempre se ve.
     FLAlertLayer::create(
+        nullptr,
         "Image Exporter",
-        "<cy>Principales</c> (1-8): rectangulos de color, max. <cy>10.000</c> objetos.\n"
-        "- <cg>BSP</c> para fotos, <cg>Regiones</c> para ilustraciones y pixel art, <cg>Hibrido</c> para la maxima calidad.\n"
-        "- Sin marcar = HSV a color. <cg>Canales</c> reparte los colores en canales libres (nunca el 1); <cg>Gris</c> usa escala de grises.\n"
-        "<cy>Ligeros</c> (9-18): menos objetos, sin HSV. Con <cg>Colores en canales</c> salen a color. El <cg>ASCII</c> usa texto: pon una fuente monoespaciada en el nivel y calibra el ancho de caracter en <cy>Ajustes</c>.\n"
-        "Con <cy>un objeto seleccionado</c> la imagen se centra en el; si no, en la vista. No se puede deshacer: <cr>guarda antes</c>.",
-        "OK"
+        "<cy>Principales</c> (1-8): rectángulos de color, máx. <cy>10.000</c> objetos.\n"
+        "- <cg>BSP</c> para fotos, <cg>Regiones</c> para ilustraciones y pixel art, <cg>Híbrido</c> para la máxima calidad.\n"
+        "- Sin marcar = HSV a color. <cg>Canales</c> reparte los colores en canales libres (nunca el 1); <cg>Gris</c> usa escala de grises.\n\n"
+        "<cy>Ligeros</c> (9-18): menos objetos, sin HSV. Con <cg>Colores en canales</c> salen a color.\n"
+        "- El <cg>ASCII</c> usa texto: pon una fuente monoespaciada en el nivel y calibra el ancho de carácter en <cy>Ajustes</c>.\n\n"
+        "Con <cy>un objeto seleccionado</c> la imagen se centra en él; si no, en la vista.\n"
+        "No se puede deshacer: <cr>guarda antes</c>.",
+        "OK",
+        nullptr,
+        360.f,
+        true,
+        240.f,
+        0.8f
     )->show();
 }

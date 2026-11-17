@@ -645,8 +645,8 @@ inline void asciiShapes(const Image& src, const Options& o, Result& res) {
         cols = std::max(10, int(cols * 0.85));                          // no cabe: menos columnas y reintenta
     }
     res.note = color
-        ? "ASCII a color: usa fuente monoespaciada y calibra ancho/alto de caracter en los ajustes."
-        : "ASCII: elige una fuente monoespaciada en el nivel (p. ej. fuente 5) y ajusta ancho/alto de caracter en los ajustes.";
+        ? "ASCII a color: usa fuente monoespaciada y calibra ancho/alto de carácter en los ajustes."
+        : "ASCII: elige una fuente monoespaciada en el nivel (p. ej. fuente 5) y ajusta ancho/alto de carácter en los ajustes.";
 }
 
 // ------------------------------------------------------------- despacho -----

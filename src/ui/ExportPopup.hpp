@@ -39,8 +39,8 @@ protected:
     void onPlace(CCObject*);
     void onInfo(CCObject*);
     void onSettings(CCObject*);
-    void onTabMain(CCObject*) { setTab(0); }
-    void onTabLight(CCObject*) { setTab(1); }
+    void onTabMain(CCObject*) { setTab(0); dumpUiAfter("clic en Principales", 0.3f); }
+    void onTabLight(CCObject*) { setTab(1); dumpUiAfter("clic en Ligeros", 0.3f); }
     void onPrev(CCObject*) { stepMethod(-1); }
     void onNext(CCObject*) { stepMethod(+1); }
     void onBudgetSlider(CCObject* sender);
@@ -56,7 +56,9 @@ protected:
     void stepMethod(int dir);
     gdx::Method effectiveMethod() const;
     void refreshLabels();
-    void dumpUi(float = 0.f);                                            // ajuste "dump-ui": escribe ui-dump.txt con el arbol de nodos
+    void dumpUi(float = 0.f);
+    void dumpUiAfter(char const* reason, float delay);                   // programa una instantanea del diagnostico (si el ajuste esta activo)
+    void setLines(std::vector<CCLabelBMFont*> const& lines, std::string const& text, float scale);   // reparte el texto en lineas sueltas                                            // ajuste "dump-ui": escribe ui-dump.txt con el arbol de nodos
     std::string dumpHeader() const;
 
     void loadImageBytes(std::vector<uint8_t> const& bytes);
@@ -93,7 +95,8 @@ protected:
     CCMenuItemToggler* m_tabMain = nullptr;
     CCMenuItemToggler* m_tabLight = nullptr;
     CCLabelBMFont* m_methodLabel = nullptr;
-    CCLabelBMFont* m_descLabel = nullptr;
+    std::vector<CCLabelBMFont*> m_descLines;                              // la descripcion se dibuja con una etiqueta POR LINEA (separacion fija)
+    std::string m_descText;
     CCLabelBMFont* m_budgetValue = nullptr;
     CCLabelBMFont* m_sizeValue = nullptr;
     Slider* m_budgetSlider = nullptr;
@@ -106,7 +109,9 @@ protected:
     std::vector<CCNode*> m_lightOpts;                                     // ... y de Ligeros
     CCLabelBMFont* m_statA = nullptr;
     CCLabelBMFont* m_statB = nullptr;
-    CCLabelBMFont* m_noteLabel = nullptr;
+    std::vector<CCLabelBMFont*> m_noteLines;
+    std::string m_noteText;
+    std::string m_dumpReason = "apertura";
     Ref<CCLabelBMFont> m_measure;                                        // etiqueta invisible para medir texto y partir líneas
     CCNode* m_previewHolder = nullptr;
     CCSprite* m_preview = nullptr;

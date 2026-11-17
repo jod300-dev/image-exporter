@@ -11,7 +11,7 @@
 
 using namespace geode::prelude;
 
-// Ventana del exportador (430x268, cabe en los 320 de alto de la pantalla de GD):
+// Ventana del exportador (430x288, cabe en los 320 de alto de la pantalla de GD):
 //   izquierda: vista previa + estado        derecha: pestañas Principales/Ligeros, método, sliders, opciones de color
 class ExportPopup : public geode::Popup {
 public:

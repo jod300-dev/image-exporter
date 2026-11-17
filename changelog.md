@@ -12,3 +12,6 @@
 
 # v1.1.2
 - Corregido el error de compilacion en Windows (una variable llamada "small" chocaba con una macro de Windows) y la advertencia de localtime.
+
+# v1.1.3
+- Interfaz reacomodada a partir del ui-dump.txt: Ajustes ya no se sale del marco ni tapa la pestana "Ligeros"; las pestanas ya no pisan el titulo; las perillas de los sliders ya no pisan sus etiquetas (Objetos / Lado largo); botones mas bajos, ventana un poco mas alta (288) y descripcion/nota ancladas arriba para que 3 lineas no choquen con lo de abajo.

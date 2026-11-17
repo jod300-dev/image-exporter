@@ -15,7 +15,7 @@
 namespace {
     constexpr int kMaxObjects = 10000;           // tope duro pedido: 10k objetos
     constexpr int kMinObjects = 500;
-    constexpr float kPopupW = 430.f, kPopupH = 268.f;     // cabe en los 320 de alto de la pantalla de GD
+    constexpr float kPopupW = 430.f, kPopupH = 288.f;     // cabe en los 320 de alto de la pantalla de GD (deja ~16 arriba y abajo para el boton X)
     constexpr float kPrevSize = 140.f;
     constexpr int kMinSize = 150, kMaxSize = 6000;        // lado largo, unidades GD
     constexpr int kStyleCount = int(gdx::Method::COUNT) - gdx::kNormalMethodCount;          // estilos ligeros
@@ -103,26 +103,31 @@ bool ExportPopup::init(EditorUI* editor) {
     hint->setOpacity(120);
     hint->setPosition({kPrevSize / 2, kPrevSize / 2});
     m_previewHolder->addChild(hint);
-    put(m_previewHolder, 84.f, 112.f);
+    put(m_previewHolder, 84.f, 108.f);
 
-    m_statA = label("Elige una imagen", "chatFont.fnt", 0.85f, 84.f, 194.f);
-    m_statB = label("", "chatFont.fnt", 0.75f, 84.f, 207.f);
+    m_statA = label("Elige una imagen", "chatFont.fnt", 0.85f, 84.f, 192.f);
+    m_statB = label("", "chatFont.fnt", 0.75f, 84.f, 206.f);
     m_noteLabel = CCLabelBMFont::create("", "chatFont.fnt", 600.f, kCCTextAlignmentCenter);   // 600: nunca ajusta solo; se parte a mano
     m_noteLabel->setScale(0.6f);
     m_noteLabel->setColor({255, 200, 80});
-    put(m_noteLabel, 84.f, 232.f);
+    m_noteLabel->setAnchorPoint({0.5f, 1.f});                  // anclada arriba: si hay mas lineas crece hacia abajo sin pisar el estado
+    put(m_noteLabel, 84.f, 217.f);
 
     // ============ columna derecha ============
     // pestañas
+    // Los ButtonSprite miden 39 de alto fijos; se reducen con la escala del sprite (el texto sube a 0.46 para
+    // que se lea igual que antes) para que no pisen el titulo ni el boton Ajustes.
     auto makeTab = [&](char const* text, SEL_MenuHandler cb) {
-        auto off = ButtonSprite::create(text, "bigFont.fnt", "GJ_button_04.png", 0.34f);
-        auto on = ButtonSprite::create(text, "bigFont.fnt", "GJ_button_01.png", 0.34f);
+        auto off = ButtonSprite::create(text, "bigFont.fnt", "GJ_button_04.png", 0.46f);
+        auto on = ButtonSprite::create(text, "bigFont.fnt", "GJ_button_01.png", 0.46f);
+        off->setScale(0.72f);
+        on->setScale(0.72f);
         return CCMenuItemToggler::create(off, on, this, cb);
     };
     m_tabMain = makeTab("Principales", menu_selector(ExportPopup::onTabMain));
     m_tabLight = makeTab("Ligeros", menu_selector(ExportPopup::onTabLight));
-    putBtn(m_tabMain, 222.f, 46.f);
-    putBtn(m_tabLight, 316.f, 46.f);
+    putBtn(m_tabMain, 262.f, 50.f);
+    putBtn(m_tabLight, 335.f, 50.f);
 
     // método: flechas + nombre + descripción
     auto arrow = [&](bool flip, SEL_MenuHandler cb, float x, float y) {
@@ -131,32 +136,33 @@ bool ExportPopup::init(EditorUI* editor) {
         spr->setFlipX(flip);
         putBtn(CCMenuItemSpriteExtra::create(spr, this, cb), x, y);
     };
-    arrow(false, menu_selector(ExportPopup::onPrev), 178.f, 76.f);
-    arrow(true,  menu_selector(ExportPopup::onNext), 406.f, 76.f);
-    m_methodLabel = label("", "bigFont.fnt", 0.5f, 292.f, 76.f);
+    arrow(false, menu_selector(ExportPopup::onPrev), 178.f, 79.f);
+    arrow(true,  menu_selector(ExportPopup::onNext), 406.f, 79.f);
+    m_methodLabel = label("", "bigFont.fnt", 0.5f, 292.f, 79.f);
     m_descLabel = CCLabelBMFont::create("", "chatFont.fnt", 600.f, kCCTextAlignmentCenter);   // se parte a mano (ver wrapText)
     m_descLabel->setScale(0.7f);
-    put(m_descLabel, 292.f, 102.f);
+    m_descLabel->setAnchorPoint({0.5f, 1.f});                  // anclada arriba: 2 o 3 lineas crecen hacia abajo
+    put(m_descLabel, 292.f, 92.f);
 
     // sliders: objetos y lado largo
-    label("Objetos", "bigFont.fnt", 0.34f, 168.f, 130.f, 0.f);
-    m_budgetValue = label("", "bigFont.fnt", 0.34f, 418.f, 130.f, 1.f);
+    label("Objetos", "bigFont.fnt", 0.34f, 168.f, 136.f, 0.f);
+    m_budgetValue = label("", "bigFont.fnt", 0.34f, 418.f, 136.f, 1.f);
     m_budgetSlider = Slider::create(this, menu_selector(ExportPopup::onBudgetSlider), 0.78f);
     m_budgetSlider->setValue(budgetToSlider(m_budget));
-    put(m_budgetSlider, 292.f, 146.f);
+    put(m_budgetSlider, 292.f, 157.f);
 
-    label("Lado largo", "bigFont.fnt", 0.34f, 168.f, 168.f, 0.f);
-    m_sizeValue = label("", "bigFont.fnt", 0.34f, 418.f, 168.f, 1.f);
+    label("Lado largo", "bigFont.fnt", 0.34f, 168.f, 182.f, 0.f);
+    m_sizeValue = label("", "bigFont.fnt", 0.34f, 418.f, 182.f, 1.f);
     m_sizeSlider = Slider::create(this, menu_selector(ExportPopup::onSizeSlider), 0.78f);
     m_sizeSlider->setValue(sizeToSlider(m_sizeU));
-    put(m_sizeSlider, 292.f, 184.f);
+    put(m_sizeSlider, 292.f, 203.f);
 
     // fila de color: cambia según la pestaña
     auto addCheck = [&](CCMenuItemToggler*& slot, std::vector<CCNode*>& group, SEL_MenuHandler cb, bool on, float x, char const* text) {
         slot = CCMenuItemToggler::createWithStandardSprites(this, cb, 0.5f);
         slot->toggle(on);
-        putBtn(slot, x, 208.f);
-        auto l = label(text, "bigFont.fnt", 0.28f, x + 12.f, 208.f, 0.f);
+        putBtn(slot, x, 229.f);
+        auto l = label(text, "bigFont.fnt", 0.28f, x + 12.f, 229.f, 0.f);
         group.push_back(slot);
         group.push_back(l);
     };
@@ -166,14 +172,22 @@ bool ExportPopup::init(EditorUI* editor) {
     addCheck(m_chkColor,    m_lightOpts, menu_selector(ExportPopup::onColorToggle), m_colorCheck, 174.f, "Colores en canales (sin HSV)");
 
     // botones de acción
-    auto pickBtn = CCMenuItemSpriteExtra::create(ButtonSprite::create("Imagen", "bigFont.fnt", "GJ_button_01.png", 0.42f), this, menu_selector(ExportPopup::onPick));
-    putBtn(pickBtn, 222.f, 240.f);
-    auto placeBtn = CCMenuItemSpriteExtra::create(ButtonSprite::create("Colocar", "bigFont.fnt", "GJ_button_02.png", 0.42f), this, menu_selector(ExportPopup::onPlace));
-    putBtn(placeBtn, 316.f, 240.f);
+    // Botones mas bajos (escala del sprite 0.8 con el texto a 0.52: se lee igual) centrados bajo la columna derecha.
+    auto pickSpr = ButtonSprite::create("Imagen", "bigFont.fnt", "GJ_button_01.png", 0.52f);
+    pickSpr->setScale(0.8f);
+    auto pickBtn = CCMenuItemSpriteExtra::create(pickSpr, this, menu_selector(ExportPopup::onPick));
+    putBtn(pickBtn, 252.f, 260.f);
+    auto placeSpr = ButtonSprite::create("Colocar", "bigFont.fnt", "GJ_button_02.png", 0.52f);
+    placeSpr->setScale(0.8f);
+    auto placeBtn = CCMenuItemSpriteExtra::create(placeSpr, this, menu_selector(ExportPopup::onPlace));
+    putBtn(placeBtn, 327.f, 260.f);
+    // Fila del titulo: Ajustes e info a la derecha, dentro del marco y sin tocar las pestanas.
     auto infoBtn = CCMenuItemSpriteExtra::create(CCSprite::createWithSpriteFrameName("GJ_infoIcon_001.png"), this, menu_selector(ExportPopup::onInfo));
-    putBtn(infoBtn, 408.f, 18.f);
-    auto setBtn = CCMenuItemSpriteExtra::create(ButtonSprite::create("Ajustes", "bigFont.fnt", "GJ_button_04.png", 0.26f), this, menu_selector(ExportPopup::onSettings));
-    putBtn(setBtn, 350.f, 18.f);
+    putBtn(infoBtn, 408.f, 20.f);
+    auto setSpr = ButtonSprite::create("Ajustes", "bigFont.fnt", "GJ_button_04.png", 0.4f);
+    setSpr->setScale(0.62f);
+    auto setBtn = CCMenuItemSpriteExtra::create(setSpr, this, menu_selector(ExportPopup::onSettings));
+    putBtn(setBtn, 366.f, 21.f);
 
     this->schedule(schedule_selector(ExportPopup::tick), 0.1f);
     this->setTab(m_tab);                       // aplica pestaña, etiquetas y visibilidad
@@ -222,10 +236,10 @@ void ExportPopup::refreshLabels() {
 
 void ExportPopup::setStatus(std::string const& a, std::string const& b, std::string const& note) {
     m_statA->setString(a.c_str());
-    m_statA->limitLabelWidth(150.f, 0.85f, 0.4f);
+    m_statA->limitLabelWidth(140.f, 0.85f, 0.4f);
     m_statB->setString(b.c_str());
-    m_statB->limitLabelWidth(150.f, 0.75f, 0.4f);
-    m_noteLabel->setString(wrapText(note, 0.6f, 148.f).c_str());
+    m_statB->limitLabelWidth(140.f, 0.75f, 0.4f);
+    m_noteLabel->setString(wrapText(note, 0.6f, 140.f).c_str());
 }
 
 void ExportPopup::stepMethod(int dir) {

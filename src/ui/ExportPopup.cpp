@@ -21,6 +21,11 @@ namespace {
     constexpr int kMinSize = 150, kMaxSize = 6000;        // lado largo, unidades GD
     constexpr int kStyleCount = int(gdx::Method::COUNT) - gdx::kNormalMethodCount;          // estilos ligeros
 
+    // Canales que este mod ya ha repartido en el editor abierto. Se suman a los detectados en el nivel: asi, aunque GD no
+    // devuelva algun canal alto (>= 1020) como "usado", dos imagenes colocadas seguidas NUNCA comparten canal (y no se mezclan los colores).
+    std::set<int> s_claimed;
+    LevelEditorLayer* s_claimedFor = nullptr;
+
     std::vector<std::string> s_snaps;              // instantaneas del diagnostico de esta sesion
     int s_snapCount = 0;
 
@@ -367,6 +372,23 @@ std::string ExportPopup::dumpHeader() const {
     info("m_mainLayer", m_mainLayer);
     info("m_buttonMenu", m_buttonMenu);
 
+    {
+        auto used = usedChannels();
+        int nHigh = 0;
+        for (int c : used) if (c >= gdx::kChanHighMin) ++nHigh;
+        h << "\n=== CANALES DE COLOR ===\n";
+        h << "canales ocupados detectados: " << used.size() << " (del tramo 1020+: " << nHigh << ")   libres utilizables: "
+          << gdx::countFreeChannels(used) << "   reservados por el mod en esta sesion: " << s_claimed.size() << "\n";
+        h << "ocupados >= 1000: ";
+        int shown = 0;
+        for (int c : used) if (c >= 1000 && shown++ < 120) h << c << " ";
+        h << (shown ? "" : "(ninguno)") << "\n";
+        h << "primeros 40 ocupados: ";
+        shown = 0;
+        for (int c : used) if (shown++ < 40) h << c << " ";
+        h << "\n";
+    }
+
     h << "\n=== ESTADO DEL MOD ===\n";
     h << "pestana=" << m_tab << " metodo=" << m_method << " estilo=" << m_style << " modoPrincipal=" << m_mainMode
       << " coloresCanales=" << int(m_colorCheck) << " objetos=" << m_budget << " ladoLargo=" << m_sizeU << "u\n";
@@ -672,6 +694,8 @@ std::set<int> ExportPopup::usedChannels() const {
     std::set<int> used;
     auto lel = LevelEditorLayer::get();
     if (!lel) return used;
+    if (s_claimedFor != lel) { s_claimed.clear(); s_claimedFor = lel; }      // otro editor: se olvidan las reservas
+    used.insert(s_claimed.begin(), s_claimed.end());
     if (lel->m_objects) {
         for (auto* obj : CCArrayExt<GameObject*>(lel->m_objects)) {
             if (!obj) continue;
@@ -688,7 +712,11 @@ std::set<int> ExportPopup::usedChannels() const {
     for (auto* mgr : managers) {
         auto* actions = mgr->getAllColorActions();
         if (!actions) continue;
-        for (auto* a : CCArrayExt<ColorAction*>(actions)) if (a) used.insert(a->m_colorID);
+        for (auto* a : CCArrayExt<ColorAction*>(actions)) {
+            if (!a) continue;
+            used.insert(a->m_colorID);                                   // canal con color definido (en cualquier rango, tambien >= 1020)
+            if (a->m_copyID > 0) used.insert(a->m_copyID);               // canal que otro canal copia: tambien esta en uso
+        }
     }
     return used;
 }
@@ -756,6 +784,12 @@ void ExportPopup::onPlace(CCObject*) {
             return;
         }
         eo.channels = chosen;
+        for (int c : chosen) s_claimed.insert(c);                    // reservados para que la siguiente imagen use otros distintos
+        {
+            int nHigh = int(std::count_if(chosen.begin(), chosen.end(), [](int c) { return c >= gdx::kChanHighMin; }));
+            log::info("Canales asignados: {} (rango {}-{}, {} del tramo 1020+); canales ya usados antes: {}",
+                      chosen.size(), *std::min_element(chosen.begin(), chosen.end()), *std::max_element(chosen.begin(), chosen.end()), nHigh, used.size());
+        }
         this->applyChannelColorsDirect(eo, cmap);                    // define los colores ANTES de crear los objetos
     }
 

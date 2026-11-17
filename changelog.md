@@ -26,3 +26,5 @@
 
 # v1.1.5
 - Canales de color: al acabarse los canales 2-999 ya no se vuelve a HSV; el reparto continua en el 1020 y sigue hasta el 9999, saltando 1000-1019 (canales especiales de GD: BG, G1, G2, negro, blanco...). Hay hasta 9978 canales utilizables en vez de 998.
+- Canales: el mod recuerda los canales que ya reparti en el editor abierto y los suma a los detectados en el nivel (objetos, colores definidos y canales copiados por otro canal), tambien en el tramo 1020+. Una imagen nueva siempre salta los canales ocupados y usa el siguiente libre, asi no se mezclan los colores con los de una imagen anterior.
+- El diagnostico de UI ahora incluye una seccion CANALES DE COLOR (ocupados detectados, ocupados >= 1000, libres, reservados) y el log muestra el rango asignado al colocar.

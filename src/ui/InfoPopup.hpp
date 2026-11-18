@@ -35,13 +35,13 @@ protected:
         struct Para { char const* text; ccColor3B color; };
         ccColor3B const white{255, 255, 255}, yellow{255, 255, 80}, red{255, 110, 110};
         std::vector<Para> paras = {
-            {"Principales (1-8): rectangulos de color, max. 10.000 objetos.", yellow},
-            {"BSP para fotos, Regiones para ilustraciones y pixel art, Hibrido para la maxima calidad.", white},
-            {"Sin marcar = HSV a color. Canales reparte los colores en canales libres (2-999 y luego 1020 en adelante; nunca el 1). Gris usa escala de grises.", white},
-            {"Ligeros (9-18): menos objetos y sin HSV. Con Colores en canales salen a color.", yellow},
-            {"El ASCII usa texto: pon una fuente monoespaciada en el nivel y calibra el ancho de caracter en Ajustes.", white},
-            {"Con un objeto seleccionado la imagen se centra en el; si no, en la vista.", white},
-            {"No se puede deshacer: guarda antes.", red},
+            {"Main (1-8): color rectangles, max. 10,000 objects.", yellow},
+            {"BSP for photos, Regions for illustrations and pixel art, Hybrid for maximum quality.", white},
+            {"Unchecked = HSV color. Channels spreads the colors over free channels (2-999, then 1020 onward; never 1). Gray uses a grayscale.", white},
+            {"Light (9-18): fewer objects and no HSV. With Colors in channels they come out in color.", yellow},
+            {"ASCII uses text: set a monospaced font in the level and calibrate the character width in Settings.", white},
+            {"With one object selected the image is centered on it; otherwise, on the view.", white},
+            {"This cannot be undone: save first.", red},
         };
 
         // etiqueta invisible que sirve para medir el ancho real de cada linea candidata

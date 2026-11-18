@@ -107,9 +107,9 @@ static std::vector<Shape> parseGd(const std::string& str, const Result& r, const
 }
 
 int main(int argc, char** argv) {
-    if (argc < 2) { std::printf("uso: %s imagen [presupuesto] [salida] [metodo|all]\n", argv[0]); return 1; }
+    if (argc < 2) { std::printf("usage: %s image [budget] [output] [method|all]\n", argv[0]); return 1; }
     Image src = loadImage(argv[1]);
-    if (src.empty()) { std::printf("no se pudo cargar %s\n", argv[1]); return 1; }
+    if (src.empty()) { std::printf("could not load %s\n", argv[1]); return 1; }
     int budget = argc > 2 ? std::atoi(argv[2]) : 10000;
     std::string outDir = argc > 3 ? argv[3] : ".";
     int only = (argc > 4 && std::strcmp(argv[4], "all") != 0) ? std::atoi(argv[4]) : -1;
@@ -129,16 +129,16 @@ int main(int argc, char** argv) {
     std::set<int> used; for (int c = 2; c <= 9; ++c) used.insert(c); for (int c = 7; c <= 999; c += 7) used.insert(c);
     opt.maxChannels = countFreeChannels(used);
 
-    std::printf("Imagen %dx%d  presupuesto=%d  alfa=%s  modo-principal=%d  ligero-color=%d  canales-libres=%d\n", src.w, src.h, budget,
-                hasTransparency(src, 128) ? "si" : "no", mainMode, int(opt.colorChannels), opt.maxChannels);
-    std::printf("%-26s %7s %8s %7s %6s %4s  %s\n", "metodo", "objetos", "PSNR dB", "ms", "KB", "can", "validacion");
+    std::printf("Image %dx%d  budget=%d  alpha=%s  main-mode=%d  light-color=%d  free-channels=%d\n", src.w, src.h, budget,
+                hasTransparency(src, 128) ? "yes" : "no", mainMode, int(opt.colorChannels), opt.maxChannels);
+    std::printf("%-26s %7s %8s %7s %6s %4s  %s\n", "method", "objects", "PSNR dB", "ms", "KB", "chan", "validation");
     int fails = 0;
     for (int m = 0; m < int(Method::COUNT); ++m) {
         if (only >= 0 && m != only) continue;
         Result r = convert(src, Method(m), opt, nullptr);
         std::string why;
         size_t nObj = r.shapes.size() + r.textRows.size();
-        if (int(nObj) > budget) why += "SUPERA-PRESUPUESTO ";
+        if (int(nObj) > budget) why += "OVER-BUDGET ";
         if (nObj == 0) why += "VACIO ";
 
         // canales libres para este resultado
@@ -149,28 +149,28 @@ int main(int argc, char** argv) {
         std::map<int, std::array<uint8_t, 3>> chanColors;
         if (r.colored) {
             eo.channels = pickFreeChannels(used, 2, int(cmap.colors.size()));
-            if (eo.channels.size() != cmap.colors.size()) why += "FALTAN-CANALES ";
+            if (eo.channels.size() != cmap.colors.size()) why += "MISSING-CHANNELS ";
             for (size_t i = 0; i < eo.channels.size(); ++i) {
                 chanColors[eo.channels[i]] = cmap.colors[i];
                 if (eo.channels[i] == 1 || used.count(eo.channels[i]) || eo.channels[i] > 999) why += "CANAL-INVALIDO ";
             }
-            if (int(cmap.colors.size()) > opt.maxChannels) why += "MAS-COLORES-QUE-CANALES ";
+            if (int(cmap.colors.size()) > opt.maxChannels) why += "MORE-COLORS-THAN-CHANNELS ";
         }
         std::string gd = toGdString(r, eo);
         std::vector<ParsedObj> objs; bool fmtOk;
         auto back = parseGd(gd, r, eo, chanColors, objs, fmtOk);
         if (!fmtOk) why += "FORMATO ";
-        if (objs.size() != nObj) why += "NUM-OBJETOS ";
+        if (objs.size() != nObj) why += "OBJECT-COUNT ";
 
         // reglas de la cadena
         int baseMaxKey = -1000000, inkMinKey = 1000000; int textIdx = 0;
         for (auto& po : objs) {
-            if (!po.hasZ) why += "SIN-Z-ORDER ";
-            if (r.colored && po.hasHsv) why += "HSV-EN-MODO-CANALES ";
-            if (!r.colored && !r.mono && !po.hasHsv) why += "SIN-HSV ";
+            if (!po.hasZ) why += "NO-Z-ORDER ";
+            if (r.colored && po.hasHsv) why += "HSV-IN-CHANNEL-MODE ";
+            if (!r.colored && !r.mono && !po.hasHsv) why += "NO-HSV ";
             if (r.colored && (po.ch < 2 || po.ch > 999 || used.count(po.ch))) why += "CANAL-USADO ";
             if (r.mono) {
-                if (!po.hasLayer) why += "SIN-CAPA ";
+                if (!po.hasLayer) why += "NO-LAYER ";
                 // orden de dibujo: (capa, z-order). La base/papel debe quedar siempre por debajo de la tinta.
                 int key = po.layer * 100000 + po.z;
                 bool isText = po.id == 914;
@@ -179,12 +179,12 @@ int main(int argc, char** argv) {
             }
             if (po.id == 914) {
                 std::string txt = b64dec(po.b64);
-                if (int(txt.size()) > opt.asciiChunk) why += "TEXTO-MAS-LARGO-QUE-CHUNK ";
+                if (int(txt.size()) > opt.asciiChunk) why += "TEXT-LONGER-THAN-CHUNK ";
                 if (textIdx >= int(r.textRows.size()) || txt != r.textRows[size_t(textIdx)].text) why += "TEXTO-DISTINTO ";
                 ++textIdx;
             }
         }
-        if (r.mono && baseMaxKey != -1000000 && inkMinKey != 1000000 && baseMaxKey >= inkMinKey) why += "BASE-POR-ENCIMA-DE-LA-TINTA ";
+        if (r.mono && baseMaxKey != -1000000 && inkMinKey != 1000000 && baseMaxKey >= inkMinKey) why += "BASE-ABOVE-THE-INK ";
 
         // parámetros tras exportar y reinterpretar
         double maxPos = 0, maxRot = 0; int maxCol = 0;
@@ -195,7 +195,7 @@ int main(int argc, char** argv) {
                 double dr = std::abs(std::fmod(p0.rot - p1.rot, 180.0f)); maxRot = std::max(maxRot, std::min(dr, 180.0 - dr));
                 maxCol = std::max({maxCol, std::abs(int(p0.r) - p1.r), std::abs(int(p0.g) - p1.g), std::abs(int(p0.b) - p1.b)});
             }
-        } else why += "FORMAS ";
+        } else why += "SHAPES ";
         if (maxPos >= 0.01 || maxRot >= 0.02 || maxCol > 1) why += "DESVIACION ";
 
         // cobertura: sin huecos transparentes cuando la imagen es opaca
@@ -241,6 +241,6 @@ int main(int argc, char** argv) {
         char path[512]; std::snprintf(path, sizeof path, "%s/ref.png", outDir.c_str());
         savePreview(path, resizeArea(src, w, h), true);
     }
-    std::printf(fails ? "\nHAY FALLOS: %d\n" : "\nTodo correcto.\n", fails);
+    std::printf(fails ? "\nFAILURES: %d\n" : "\nAll good.\n", fails);
     return fails ? 2 : 0;
 }

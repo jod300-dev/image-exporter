@@ -39,8 +39,8 @@ protected:
     void onPlace(CCObject*);
     void onInfo(CCObject*);
     void onSettings(CCObject*);
-    void onTabMain(CCObject*) { setTab(0); dumpUiAfter("clic en Principales", 0.3f); }
-    void onTabLight(CCObject*) { setTab(1); dumpUiAfter("clic en Ligeros", 0.3f); }
+    void onTabMain(CCObject*) { setTab(0); dumpUiAfter("clicked Main", 0.3f); }
+    void onTabLight(CCObject*) { setTab(1); dumpUiAfter("clicked Light", 0.3f); }
     void onPrev(CCObject*) { stepMethod(-1); }
     void onNext(CCObject*) { stepMethod(+1); }
     void onBudgetSlider(CCObject* sender);
@@ -111,7 +111,7 @@ protected:
     CCLabelBMFont* m_statB = nullptr;
     std::vector<CCLabelBMFont*> m_noteLines;
     std::string m_noteText;
-    std::string m_dumpReason = "apertura";
+    std::string m_dumpReason = "opened";
     Ref<CCLabelBMFont> m_measure;                                        // etiqueta invisible para medir texto y partir líneas
     CCNode* m_previewHolder = nullptr;
     CCSprite* m_preview = nullptr;

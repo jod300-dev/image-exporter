@@ -17,42 +17,42 @@ struct MethodInfo { const char* name; const char* desc; bool slow; };
 
 inline const MethodInfo& methodInfo(Method m) {
     static const MethodInfo kInfo[int(Method::COUNT)] = {
-        {"1. Cuadricula uniforme",
-         "Una celda por objeto con el color medio. Rapido; ideal para pixel art.", false},
-        {"2. Quadtree adaptativo",
-         "Divide en 4 solo donde hay detalle. Usa justo el limite de objetos.", false},
-        {"3. BSP adaptativo (k-d)",
-         "Cortes optimos en X o Y: rectangulos de cualquier forma. Muy bueno en fotos.", false},
-        {"4. Piramide de capas",
-         "Bloque grande y capas de detalle solo donde el color cambia. Ahorra objetos.", false},
-        {"5. Regiones por paleta",
-         "Reduce la paleta y fusiona zonas iguales en rectangulos. Para ilustraciones.", false},
-        {"6. Franjas horizontales",
-         "Tiras de color por filas o columnas con tolerancia. Estilo escaneo, muy rapido.", false},
-        {"7. Rectangulos rotados",
-         "Rectangulos girados por busqueda aleatoria (estilo Geometrize). Aspecto pictorico.", true},
-        {"8. Hibrido BSP + rotados",
-         "Base BSP mas rectangulos rotados sobre los residuos. Maxima calidad.", true},
-        {"9. Halftone (diamantes)",
-         "Trama de periodico: diamantes cuyo tamano sigue la oscuridad. Sin HSV.", false},
-        {"10. Grabado de lineas",
-         "Lineas paralelas de grosor variable, como un grabado. Pocos objetos.", false},
-        {"11. Sombreado cruzado",
-         "Capas de rayas a 45, 135, 0 y 90 grados segun la oscuridad. Sin HSV.", false},
-        {"12. Estarcido (puntos)",
-         "Nube de puntos mas densa donde la imagen es oscura (puntillismo).", false},
-        {"13. Tramado Bayer",
-         "Blanco y negro con tramado ordenado, fusionado en rectangulos. Sin HSV.", false},
-        {"14. Tinta (comic)",
-         "Umbral adaptativo: manchas de tinta solidas, estilo comic. Muy pocos objetos.", false},
-        {"15. Boceto de trazos",
-         "Trazos cortos orientados sobre los bordes, como un dibujo a lapiz.", false},
-        {"16. Espiral",
-         "Una espiral cuyo grosor sigue la oscuridad de la imagen.", false},
-        {"17. Diagonales 10 PRINT",
-         "Una diagonal / o \\ por celda segun la estructura local y el tono.", false},
-        {"18. Arte ASCII (texto)",
-         "Texto en objetos de texto: la imagen en pocos objetos. Pide fuente monoespaciada.", false},
+        {"1. Uniform grid",
+         "One cell per object using the average color. Fast; ideal for pixel art.", false},
+        {"2. Adaptive quadtree",
+         "Splits into 4 only where there is detail. Uses exactly the object limit.", false},
+        {"3. Adaptive BSP (k-d)",
+         "Optimal cuts in X or Y: rectangles of any shape. Great for photos.", false},
+        {"4. Layer pyramid",
+         "A big block plus detail layers only where the color changes. Saves objects.", false},
+        {"5. Palette regions",
+         "Reduces the palette and merges equal areas into rectangles. For illustrations.", false},
+        {"6. Horizontal strips",
+         "Color strips by rows or columns with tolerance. Scanline style, very fast.", false},
+        {"7. Rotated rectangles",
+         "Rotated rectangles found by random search (Geometrize style). Painterly look.", true},
+        {"8. Hybrid BSP + rotated",
+         "BSP base plus rotated rectangles over the leftovers. Maximum quality.", true},
+        {"9. Halftone (diamonds)",
+         "Newspaper halftone: diamonds whose size follows darkness. No HSV.", false},
+        {"10. Line engraving",
+         "Parallel lines of varying thickness, like an engraving. Few objects.", false},
+        {"11. Cross-hatching",
+         "Stripe layers at 45, 135, 0 and 90 degrees depending on darkness. No HSV.", false},
+        {"12. Stippling (dots)",
+         "Dot cloud, denser where the image is dark (pointillism).", false},
+        {"13. Bayer dithering",
+         "Black and white ordered dithering, merged into rectangles. No HSV.", false},
+        {"14. Ink (comic)",
+         "Adaptive threshold: solid ink blots, comic style. Very few objects.", false},
+        {"15. Stroke sketch",
+         "Short strokes oriented along the edges, like a pencil drawing.", false},
+        {"16. Spiral",
+         "A spiral whose thickness follows the darkness of the image.", false},
+        {"17. 10 PRINT diagonals",
+         "One / or \\ diagonal per cell depending on local structure and tone.", false},
+        {"18. ASCII art (text)",
+         "Text in text objects: the image in a few objects. Needs a monospaced font.", false},
     };
     return kInfo[int(m)];
 }
@@ -86,7 +86,7 @@ inline Result convert(const Image& srcIn, Method method, const Options& opt, Pro
     // con transparencia se usa BSP (que sí respeta los bordes) y se avisa.
     if (res.hadAlpha && (method == Method::Geometrize || method == Method::Hybrid)) {
         method = Method::BSP;
-        res.note = "Imagen con transparencia: se uso BSP (los rectangulos rotados no pueden dejar huecos).";
+        res.note = "Image with transparency: BSP was used (rotated rectangles cannot leave gaps).";
     }
 
     Image reference;            // raster contra el que se mide el PSNR
@@ -147,7 +147,7 @@ inline Result convert(const Image& srcIn, Method method, const Options& opt, Pro
             if (res.colored && !o.colorChannels && o.maxChannels < 2) {       // sin canales libres: especiales 1010/1011
                 res.colored = false;
                 for (auto& t : res.textRows) t.colored = false;
-                res.note = "No hay canales libres: se usan los especiales 1010/1011.";
+                res.note = "No free channels: the special channels 1010/1011 are used.";
             }
             res.psnr = -1;                       // la fidelidad tonal no se mide en dB para tramas
             break;

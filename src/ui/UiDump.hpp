@@ -130,7 +130,7 @@ inline void analyzeLabel(CCLabelBMFont* l, std::string& missing, std::string& li
     for (size_t i = 0; i < cps.size(); ++i) {
         if (cps[i] == '\n' || tags.count(int(i))) continue;
         char b[48];
-        std::snprintf(b, sizeof b, "%sindice %zu = U+%04X", nMissing ? "; " : "", i, static_cast<unsigned>(cps[i]));
+        std::snprintf(b, sizeof b, "%sindex %zu = U+%04X", nMissing ? "; " : "", i, static_cast<unsigned>(cps[i]));
         m << b;
         ++nMissing;
     }
@@ -148,15 +148,15 @@ inline void analyzeLabel(CCLabelBMFont* l, std::string& missing, std::string& li
     float perUnit = std::sqrt((w1.x - w0.x) * (w1.x - w0.x) + (w1.y - w0.y) * (w1.y - w0.y));
     std::ostringstream o;
     o << std::fixed << std::setprecision(1);
-    o << "lineas=" << lines.size() << " (saltos de linea en la cadena=" << std::count(str.begin(), str.end(), '\n') << ")";
+    o << "lines=" << lines.size() << " (line breaks in the string=" << std::count(str.begin(), str.end(), '\n') << ")";
     if (!lines.empty()) {
-        o << " y_local=[";
+        o << " local_y=[";
         for (size_t i = 0; i < lines.size(); ++i) o << (i ? ", " : "") << lines[i];
         o << "]";
         if (lines.size() > 1) {
-            o << " paso_local=[";
+            o << " local_step=[";
             for (size_t i = 1; i < lines.size(); ++i) o << (i > 1 ? ", " : "") << (lines[i - 1] - lines[i]);
-            o << "] paso_mundo=[";
+            o << "] world_step=[";
             for (size_t i = 1; i < lines.size(); ++i) o << (i > 1 ? ", " : "") << (lines[i - 1] - lines[i]) * perUnit;
             o << "]";
         }
@@ -184,13 +184,13 @@ inline void walk(CCNode* n, int parent, int depth, bool parentVisible, std::vect
         analyzeLabel(l, r.missing, r.lineInfo);
         ccColor3B c = l->getColor();
         std::snprintf(cb, sizeof cb, " | color=(%d,%d,%d) op=%d", int(c.r), int(c.g), int(c.b), int(l->getOpacity()));
-        extra += " | texto=\"" + escapeText(r.text) + "\"" + cb;
+        extra += " | text=\"" + escapeText(r.text) + "\"" + cb;
         extra += " | " + r.lineInfo;
-        if (!r.missing.empty()) extra += " | GLIFOS AUSENTES (la fuente no los tiene): " + r.missing;
+        if (!r.missing.empty()) extra += " | MISSING GLYPHS (the font does not have them): " + r.missing;
     } else if (auto* sp = typeinfo_cast<CCSprite*>(n)) {
         CCRect tr = sp->getTextureRect();
         ccColor3B c = sp->getColor();
-        std::snprintf(cb, sizeof cb, " | textura=%.0fx%.0f en (%.0f,%.0f) flipX=%d flipY=%d color=(%d,%d,%d) op=%d",
+        std::snprintf(cb, sizeof cb, " | texture=%.0fx%.0f at (%.0f,%.0f) flipX=%d flipY=%d color=(%d,%d,%d) op=%d",
                       tr.size.width, tr.size.height, tr.origin.x, tr.origin.y, int(sp->isFlipX()), int(sp->isFlipY()),
                       int(c.r), int(c.g), int(c.b), int(sp->getOpacity()));
         extra += cb;
@@ -200,16 +200,16 @@ inline void walk(CCNode* n, int parent, int depth, bool parentVisible, std::vect
         extra += cb;
     }
     if (auto* ly = typeinfo_cast<CCLayer*>(n)) {
-        std::snprintf(cb, sizeof cb, " | touch=%d prioridad=%d", int(ly->isTouchEnabled()), int(ly->getTouchPriority()));
+        std::snprintf(cb, sizeof cb, " | touch=%d priority=%d", int(ly->isTouchEnabled()), int(ly->getTouchPriority()));
         extra += cb;
     }
     if (auto* it = typeinfo_cast<CCMenuItem*>(n)) {
         r.kind = 2;
         r.on = it->isEnabled();
-        extra += std::string(" | boton activo=") + (r.on ? "si" : "no");
+        extra += std::string(" | button enabled=") + (r.on ? "yes" : "no");
         if (auto* tg = typeinfo_cast<CCMenuItemToggler*>(n)) {
-            r.state = tg->isToggled() ? "marcado" : "sin marcar";
-            extra += std::string(" marcado=") + (tg->isToggled() ? "si" : "no");
+            r.state = tg->isToggled() ? "checked" : "unchecked";
+            extra += std::string(" checked=") + (tg->isToggled() ? "yes" : "no");
         }
     }
 
@@ -221,8 +221,8 @@ inline void walk(CCNode* n, int parent, int depth, bool parentVisible, std::vect
     size_t nch = n->getChildren() ? n->getChildrenCount() : 0;
     char buf[560];
     std::snprintf(buf, sizeof buf,
-        "[%d] %s tag=%d z=%d vis=%d(%d) pos=(%.2f,%.2f) ancla=(%.2f,%.2f) tam=(%.2f,%.2f) escala=(%.3f,%.3f) sesgo=(%.1f,%.1f) rot=%.1f hijos=%zu"
-        " | mundo=[%.1f,%.1f -> %.1f,%.1f] %.1fx%.1f",
+        "[%d] %s tag=%d z=%d vis=%d(%d) pos=(%.2f,%.2f) anchor=(%.2f,%.2f) size=(%.2f,%.2f) scale=(%.3f,%.3f) skew=(%.1f,%.1f) rot=%.1f children=%zu"
+        " | world=[%.1f,%.1f -> %.1f,%.1f] %.1fx%.1f",
         idx, cls.c_str(), n->getTag(), n->getZOrder(), int(n->isVisible()), int(r.visible),
         pos.x, pos.y, anc.x, anc.y, sz.width, sz.height, n->getScaleX(), n->getScaleY(), n->getSkewX(), n->getSkewY(),
         n->getRotation(), nch, r.x0, r.y0, r.x1, r.y1, r.x1 - r.x0, r.y1 - r.y0);
@@ -244,41 +244,41 @@ inline bool isAncestor(std::vector<Rec> const& recs, int anc, int node) {
 inline void dumpLayer(CCNode* root, CCNode* frame, std::ostringstream& out) {
     float fx0 = 0, fy0 = 0, fx1 = 0, fy1 = 0;
     if (frame) worldBox(frame, fx0, fy0, fx1, fy1);
-    out << "--- MARCO (mundo) ---\n";
+    out << "--- FRAME (world) ---\n";
     out << "[" << fx0 << "," << fy0 << " -> " << fx1 << "," << fy1 << "]  " << (fx1 - fx0) << "x" << (fy1 - fy0) << "\n\n";
 
-    out << "--- ARBOL DE NODOS ---\n";
-    out << "[indice] clase tag z vis=propia(real) pos ancla tam escala sesgo rot hijos | mundo=[caja en pantalla] ancho x alto | extras\n";
+    out << "--- NODE TREE ---\n";
+    out << "[index] class tag z vis=own(real) pos anchor size scale skew rot children | world=[on-screen box] width x height | extras\n";
     std::vector<Rec> recs;
     walk(root, -1, 0, true, recs, out);
 
-    out << "\n--- RESUMEN DE TEXTOS (visibles) ---\n";
-    out << "[indice] caja en pantalla | texto literal | glifos ausentes\n";
+    out << "\n--- TEXT SUMMARY (visible) ---\n";
+    out << "[index] on-screen box | literal text | missing glyphs\n";
     int nt = 0;
     for (size_t i = 0; i < recs.size(); ++i) {
         Rec const& a = recs[i];
         if (a.kind != 1 || !a.visible || a.text.empty()) continue;
         char buf[200];
         std::snprintf(buf, sizeof buf, "[%zu] [%.1f,%.1f -> %.1f,%.1f] %.1fx%.1f | ", i, a.x0, a.y0, a.x1, a.y1, a.x1 - a.x0, a.y1 - a.y0);
-        out << buf << "\"" << escapeText(a.text) << "\" | " << (a.missing.empty() ? "(todos los glifos existen)" : a.missing) << "\n";
+        out << buf << "\"" << escapeText(a.text) << "\" | " << (a.missing.empty() ? "(all glyphs exist)" : a.missing) << "\n";
         ++nt;
     }
-    if (!nt) out << "(ninguno)\n";
+    if (!nt) out << "(none)\n";
 
-    out << "\n--- RESUMEN DE BOTONES (visibles) ---\n";
+    out << "\n--- BUTTON SUMMARY (visible) ---\n";
     int nb = 0;
     for (size_t i = 0; i < recs.size(); ++i) {
         Rec const& a = recs[i];
         if (a.kind != 2 || !a.visible) continue;
         char buf[200];
-        std::snprintf(buf, sizeof buf, "[%zu] %s [%.1f,%.1f -> %.1f,%.1f] %.1fx%.1f activo=%s %s\n", i, a.label.c_str(), a.x0, a.y0, a.x1, a.y1,
-                      a.x1 - a.x0, a.y1 - a.y0, a.on ? "si" : "no", a.state.c_str());
+        std::snprintf(buf, sizeof buf, "[%zu] %s [%.1f,%.1f -> %.1f,%.1f] %.1fx%.1f enabled=%s %s\n", i, a.label.c_str(), a.x0, a.y0, a.x1, a.y1,
+                      a.x1 - a.x0, a.y1 - a.y0, a.on ? "yes" : "no", a.state.c_str());
         out << buf;
         ++nb;
     }
-    if (!nb) out << "(ninguno)\n";
+    if (!nb) out << "(none)\n";
 
-    out << "\n--- SOLAPES entre textos/botones (visibles) ---\n";
+    out << "\n--- OVERLAPS between texts/buttons (visible) ---\n";
     int overlaps = 0;
     for (size_t i = 0; i < recs.size(); ++i) {
         Rec const& a = recs[i];
@@ -298,16 +298,16 @@ inline void dumpLayer(CCNode* root, CCNode* frame, std::ostringstream& out) {
             float pct = minArea > 0 ? 100.f * area / minArea : 0.f;
             if (pct < 5.f) continue;
             char buf[400];
-            std::snprintf(buf, sizeof buf, "[%zu] %s  <->  [%zu] %s : solape %.1fx%.1f (%.0f%% del menor)\n",
+            std::snprintf(buf, sizeof buf, "[%zu] %s  <->  [%zu] %s : overlap %.1fx%.1f (%.0f%% of the smaller)\n",
                           i, a.label.c_str(), j, b.label.c_str(), ox, oy, pct);
             out << buf;
             ++overlaps;
         }
     }
-    if (!overlaps) out << "(ninguno)\n";
+    if (!overlaps) out << "(none)\n";
 
-    out << "\n--- TEXTOS/BOTONES FUERA DEL MARCO (margen 0.5) ---\n";
-    out << "(el boton X de cerrar sobresale a proposito)\n";
+    out << "\n--- TEXTS/BUTTONS OUTSIDE THE FRAME (margin 0.5) ---\n";
+    out << "(the close X button sticks out on purpose)\n";
     int outside = 0;
     for (size_t i = 0; i < recs.size(); ++i) {
         Rec const& a = recs[i];
@@ -316,12 +316,12 @@ inline void dumpLayer(CCNode* root, CCNode* frame, std::ostringstream& out) {
         float worst = std::max(std::max(l, r), std::max(t, b));
         if (worst <= 0.5f) continue;
         char buf[400];
-        std::snprintf(buf, sizeof buf, "[%zu] %s : izq %.1f  der %.1f  arriba %.1f  abajo %.1f (positivo = fuera)\n",
+        std::snprintf(buf, sizeof buf, "[%zu] %s : left %.1f  right %.1f  top %.1f  bottom %.1f (positive = outside)\n",
                       i, a.label.c_str(), l, r, t, b);
         out << buf;
         ++outside;
     }
-    if (!outside) out << "(ninguno)\n";
+    if (!outside) out << "(none)\n";
 }
 
 // Instantanea completa: cabecera del mod + escena + TODAS las ventanas (FLAlertLayer/Popup) que haya encima, cada una con su arbol entero.
@@ -331,9 +331,9 @@ inline std::string dumpScene(std::string const& header) {
     out << header << "\n";
 
     auto* scene = CCDirector::get()->getRunningScene();
-    out << "=== ESCENA EN EJECUCION ===\n";
+    out << "=== RUNNING SCENE ===\n";
     if (!scene) { out << "(ninguna)\n"; return out.str(); }
-    out << "clase=" << className(scene) << " hijos=" << scene->getChildrenCount() << "\n";
+    out << "class=" << className(scene) << " children=" << scene->getChildrenCount() << "\n";
     std::vector<FLAlertLayer*> alerts;
     if (auto* children = scene->getChildren()) {
         int i = 0;
@@ -342,7 +342,7 @@ inline std::string dumpScene(std::string const& header) {
             worldBox(c, x0, y0, x1, y1);
             CCPoint p = c->getPosition(); CCSize s = c->getContentSize();
             char buf[400];
-            std::snprintf(buf, sizeof buf, "  (%d) %s tag=%d z=%d vis=%d pos=(%.1f,%.1f) tam=(%.1f,%.1f) escala=(%.3f,%.3f) hijos=%zu | mundo=[%.1f,%.1f -> %.1f,%.1f]\n",
+            std::snprintf(buf, sizeof buf, "  (%d) %s tag=%d z=%d vis=%d pos=(%.1f,%.1f) size=(%.1f,%.1f) scale=(%.3f,%.3f) children=%zu | world=[%.1f,%.1f -> %.1f,%.1f]\n",
                           i++, className(c).c_str(), c->getTag(), c->getZOrder(), int(c->isVisible()), p.x, p.y, s.width, s.height,
                           c->getScaleX(), c->getScaleY(), c->getChildrenCount(), x0, y0, x1, y1);
             out << buf;
@@ -353,11 +353,11 @@ inline std::string dumpScene(std::string const& header) {
     int k = 0;
     for (auto* al : alerts) {
         out << "\n############################################################\n";
-        out << "### VENTANA " << ++k << " de " << alerts.size() << ": " << className(al) << "  z=" << al->getZOrder() << " vis=" << int(al->isVisible()) << "\n";
+        out << "### WINDOW " << ++k << " of " << alerts.size() << ": " << className(al) << "  z=" << al->getZOrder() << " vis=" << int(al->isVisible()) << "\n";
         out << "############################################################\n";
         dumpLayer(al, al->m_mainLayer, out);
     }
-    if (alerts.empty()) out << "\n(no hay ninguna ventana FLAlertLayer/Popup en la escena)\n";
+    if (alerts.empty()) out << "\n(there is no FLAlertLayer/Popup window in the scene)\n";
     return out.str();
 }
 

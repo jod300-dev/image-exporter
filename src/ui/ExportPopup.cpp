@@ -31,10 +31,10 @@ namespace {
 
     int qualityFromSetting() {
         auto q = Mod::get()->getSettingValue<std::string>("quality");
-        if (q == "Rapido" || q == "Rapido") return 0;
+        if (q == "Fast" || q == "Rapido") return 0;      // (the old Spanish values still work)
         if (q == "Normal") return 1;
-        if (q == "Maximo" || q == "Maximo") return 3;
-        return 2;                                  // Alto (por defecto)
+        if (q == "Maximum" || q == "Maximo") return 3;
+        return 2;                                  // High (default)
     }
     // sliders: 0..1 <-> valor
     float budgetToSlider(int b) { return std::clamp(float(b - kMinObjects) / float(kMaxObjects - kMinObjects), 0.f, 1.f); }
@@ -110,13 +110,13 @@ bool ExportPopup::init(EditorUI* editor) {
     m_previewHolder->setContentSize({kPrevSize, kPrevSize});
     m_previewHolder->setAnchorPoint({0.5f, 0.5f});
     m_previewHolder->addChild(CCLayerColor::create(ccc4(0, 0, 0, 120), kPrevSize, kPrevSize));
-    auto hint = CCLabelBMFont::create("Vista previa", "chatFont.fnt");
+    auto hint = CCLabelBMFont::create("Preview", "chatFont.fnt");
     hint->setOpacity(120);
     hint->setPosition({kPrevSize / 2, kPrevSize / 2});
     m_previewHolder->addChild(hint);
     put(m_previewHolder, 84.f, 104.f);
 
-    m_statA = label("Elige una imagen", "chatFont.fnt", 0.85f, 84.f, 186.f);
+    m_statA = label("Choose an image", "chatFont.fnt", 0.85f, 84.f, 186.f);
     m_statB = label("", "chatFont.fnt", 0.75f, 84.f, 199.f);
     // La nota (naranja) se dibuja con 3 etiquetas, una por linea, a separacion fija; asi no depende del interlineado de la fuente.
     for (int i = 0; i < 3; ++i) {
@@ -139,8 +139,8 @@ bool ExportPopup::init(EditorUI* editor) {
         on->setScale(0.72f);
         return CCMenuItemToggler::create(off, on, this, cb);
     };
-    m_tabMain = makeTab("Principales", menu_selector(ExportPopup::onTabMain));
-    m_tabLight = makeTab("Ligeros", menu_selector(ExportPopup::onTabLight));
+    m_tabMain = makeTab("Main", menu_selector(ExportPopup::onTabMain));
+    m_tabLight = makeTab("Light", menu_selector(ExportPopup::onTabLight));
     putBtn(m_tabMain, 262.f, 50.f);
     putBtn(m_tabLight, 335.f, 50.f);
 
@@ -165,13 +165,13 @@ bool ExportPopup::init(EditorUI* editor) {
     }
 
     // sliders: objetos y lado largo
-    label("Objetos", "bigFont.fnt", 0.34f, 168.f, 136.f, 0.f);
+    label("Objects", "bigFont.fnt", 0.34f, 168.f, 136.f, 0.f);
     m_budgetValue = label("", "bigFont.fnt", 0.34f, 418.f, 136.f, 1.f);
     m_budgetSlider = Slider::create(this, menu_selector(ExportPopup::onBudgetSlider), 0.78f);
     m_budgetSlider->setValue(budgetToSlider(m_budget));
     put(m_budgetSlider, 292.f, 157.f);
 
-    label("Lado largo", "bigFont.fnt", 0.34f, 168.f, 182.f, 0.f);
+    label("Long side", "bigFont.fnt", 0.34f, 168.f, 182.f, 0.f);
     m_sizeValue = label("", "bigFont.fnt", 0.34f, 418.f, 182.f, 1.f);
     m_sizeSlider = Slider::create(this, menu_selector(ExportPopup::onSizeSlider), 0.78f);
     m_sizeSlider->setValue(sizeToSlider(m_sizeU));
@@ -186,18 +186,18 @@ bool ExportPopup::init(EditorUI* editor) {
         group.push_back(slot);
         group.push_back(l);
     };
-    addCheck(m_chkChannels, m_mainOpts, menu_selector(ExportPopup::onMainChannels), m_mainMode == 1, 174.f, "Canales");
-    addCheck(m_chkGrayHsv,  m_mainOpts, menu_selector(ExportPopup::onMainGrayHsv),  m_mainMode == 2, 256.f, "Gris HSV");
-    addCheck(m_chkGrayCh,   m_mainOpts, menu_selector(ExportPopup::onMainGrayCh),   m_mainMode == 3, 338.f, "Gris canales");
-    addCheck(m_chkColor,    m_lightOpts, menu_selector(ExportPopup::onColorToggle), m_colorCheck, 174.f, "Colores en canales (sin HSV)");
+    addCheck(m_chkChannels, m_mainOpts, menu_selector(ExportPopup::onMainChannels), m_mainMode == 1, 174.f, "Channels");
+    addCheck(m_chkGrayHsv,  m_mainOpts, menu_selector(ExportPopup::onMainGrayHsv),  m_mainMode == 2, 256.f, "Gray HSV");
+    addCheck(m_chkGrayCh,   m_mainOpts, menu_selector(ExportPopup::onMainGrayCh),   m_mainMode == 3, 338.f, "Gray channels");
+    addCheck(m_chkColor,    m_lightOpts, menu_selector(ExportPopup::onColorToggle), m_colorCheck, 174.f, "Colors in channels (no HSV)");
 
     // botones de acción
     // Botones mas bajos (escala del sprite 0.8 con el texto a 0.52: se lee igual) centrados bajo la columna derecha.
-    auto pickSpr = ButtonSprite::create("Imagen", "bigFont.fnt", "GJ_button_01.png", 0.52f);
+    auto pickSpr = ButtonSprite::create("Image", "bigFont.fnt", "GJ_button_01.png", 0.52f);
     pickSpr->setScale(0.8f);
     auto pickBtn = CCMenuItemSpriteExtra::create(pickSpr, this, menu_selector(ExportPopup::onPick));
     putBtn(pickBtn, 252.f, 260.f);
-    auto placeSpr = ButtonSprite::create("Colocar", "bigFont.fnt", "GJ_button_02.png", 0.52f);
+    auto placeSpr = ButtonSprite::create("Place", "bigFont.fnt", "GJ_button_02.png", 0.52f);
     placeSpr->setScale(0.8f);
     auto placeBtn = CCMenuItemSpriteExtra::create(placeSpr, this, menu_selector(ExportPopup::onPlace));
     putBtn(placeBtn, 327.f, 260.f);
@@ -205,7 +205,7 @@ bool ExportPopup::init(EditorUI* editor) {
     auto infoBtn = CCMenuItemSpriteExtra::create(CCSprite::createWithSpriteFrameName("GJ_infoIcon_001.png"), this, menu_selector(ExportPopup::onInfo));
     putBtn(infoBtn, 408.f, 21.f);
     // Ajustes: misma fila, mismo alto y mismo estilo de texto que Imagen / Colocar, centrado bajo la vista previa.
-    auto setSpr = ButtonSprite::create("Ajustes", "bigFont.fnt", "GJ_button_04.png", 0.52f);
+    auto setSpr = ButtonSprite::create("Settings", "bigFont.fnt", "GJ_button_04.png", 0.52f);
     setSpr->setScale(0.8f);
     auto setBtn = CCMenuItemSpriteExtra::create(setSpr, this, menu_selector(ExportPopup::onSettings));
     putBtn(setBtn, 84.f, 260.f);
@@ -213,7 +213,7 @@ bool ExportPopup::init(EditorUI* editor) {
     this->schedule(schedule_selector(ExportPopup::tick), 0.1f);
     this->setTab(m_tab);                       // aplica pestaña, etiquetas y visibilidad
     // Diagnostico de la interfaz (ajuste "dump-ui"): 1 s despues, cuando ya termino la animacion de entrada y las cajas son las finales
-    this->dumpUiAfter("apertura de la ventana", 1.0f);
+    this->dumpUiAfter("window opened", 1.0f);
     return true;
 }
 
@@ -253,7 +253,7 @@ void ExportPopup::refreshLabels() {
     char buf[64];
     std::snprintf(buf, sizeof buf, "%d", m_budget);
     m_budgetValue->setString(buf);
-    std::snprintf(buf, sizeof buf, "%d u (%.1f bloques)", m_sizeU, m_sizeU / 30.0);
+    std::snprintf(buf, sizeof buf, "%d u (%.1f blocks)", m_sizeU, m_sizeU / 30.0);
     m_sizeValue->setString(buf);
 
     auto* mod = Mod::get();
@@ -329,7 +329,7 @@ void ExportPopup::onColorToggle(CCObject*) {
 
 void ExportPopup::onSettings(CCObject*) {
     openSettingsPopup(Mod::get());
-    this->dumpUiAfter("ventana de ajustes abierta", 1.2f);
+    this->dumpUiAfter("settings window opened", 1.2f);
 }
 
 // ------------------------------------------------------- diagnostico de UI ---
@@ -348,10 +348,10 @@ std::string ExportPopup::dumpHeader() const {
     localtime_r(&now, &tmv);
 #endif
     std::strftime(tbuf, sizeof tbuf, "%Y-%m-%d %H:%M:%S", &tmv);
-    h << "=== Image Exporter :: diagnostico de interfaz ===\n";
-    h << "fecha: " << tbuf << "\n";
+    h << "=== Image Exporter :: interface diagnostics ===\n";
+    h << "date: " << tbuf << "\n";
     h << "mod: " << mod->getVersion().toVString() << "   geode: " << Loader::get()->getVersion().toVString()
-      << "   gd: " << Loader::get()->getGameVersion() << "   plataforma: " << GEODE_PLATFORM_NAME << "\n";
+      << "   gd: " << Loader::get()->getGameVersion() << "   platform: " << GEODE_PLATFORM_NAME << "\n";
 
     auto* dir = CCDirector::get();
     CCSize win = dir->getWinSize(), winPx = dir->getWinSizeInPixels();
@@ -359,16 +359,16 @@ std::string ExportPopup::dumpHeader() const {
       << "   contentScaleFactor: " << dir->getContentScaleFactor() << "\n";
     if (auto* view = dir->getOpenGLView()) {
         CCSize fs = view->getFrameSize();
-        h << "ventana del juego (frame): " << fs.width << "x" << fs.height << "\n";
+        h << "game window (frame): " << fs.width << "x" << fs.height << "\n";
     }
 
     auto info = [&](char const* name, CCNode* n) {
         if (!n) { h << name << ": (null)\n"; return; }
         CCSize s = n->getContentSize(); CCPoint p = n->getPosition(), a = n->getAnchorPoint();
-        h << name << ": tam=" << s.width << "x" << s.height << " pos=(" << p.x << "," << p.y << ") ancla=(" << a.x << "," << a.y
-          << ") escala=" << n->getScaleX() << "," << n->getScaleY() << "\n";
+        h << name << ": size=" << s.width << "x" << s.height << " pos=(" << p.x << "," << p.y << ") anchor=(" << a.x << "," << a.y
+          << ") scale=" << n->getScaleX() << "," << n->getScaleY() << "\n";
     };
-    h << "popup nominal: " << kPopupW << "x" << kPopupH << "\n";
+    h << "nominal popup: " << kPopupW << "x" << kPopupH << "\n";
     info("m_mainLayer", m_mainLayer);
     info("m_buttonMenu", m_buttonMenu);
 
@@ -376,35 +376,35 @@ std::string ExportPopup::dumpHeader() const {
         auto used = usedChannels();
         int nHigh = 0;
         for (int c : used) if (c >= gdx::kChanHighMin) ++nHigh;
-        h << "\n=== CANALES DE COLOR ===\n";
-        h << "canales ocupados detectados: " << used.size() << " (del tramo 1020+: " << nHigh << ")   libres utilizables: "
-          << gdx::countFreeChannels(used) << "   reservados por el mod en esta sesion: " << s_claimed.size() << "\n";
-        h << "ocupados >= 1000: ";
+        h << "\n=== COLOR CHANNELS ===\n";
+        h << "occupied channels detected: " << used.size() << " (in the 1020+ range: " << nHigh << ")   usable free: "
+          << gdx::countFreeChannels(used) << "   reserved by the mod this session: " << s_claimed.size() << "\n";
+        h << "occupied >= 1000: ";
         int shown = 0;
         for (int c : used) if (c >= 1000 && shown++ < 120) h << c << " ";
-        h << (shown ? "" : "(ninguno)") << "\n";
-        h << "primeros 40 ocupados: ";
+        h << (shown ? "" : "(none)") << "\n";
+        h << "first 40 occupied: ";
         shown = 0;
         for (int c : used) if (shown++ < 40) h << c << " ";
         h << "\n";
     }
 
-    h << "\n=== ESTADO DEL MOD ===\n";
-    h << "pestana=" << m_tab << " metodo=" << m_method << " estilo=" << m_style << " modoPrincipal=" << m_mainMode
-      << " coloresCanales=" << int(m_colorCheck) << " objetos=" << m_budget << " ladoLargo=" << m_sizeU << "u\n";
-    h << "metodo efectivo: " << gdx::methodInfo(effectiveMethod()).name << "\n";
-    h << "ajustes: calidad=" << mod->getSettingValue<std::string>("quality") << " max-raster=" << mod->getSettingValue<int>("max-raster")
-      << " umbral-alfa=" << mod->getSettingValue<int>("alpha-threshold") << " bleed=" << mod->getSettingValue<double>("bleed")
-      << " invertir-giro=" << int(mod->getSettingValue<bool>("flip-rotation")) << "\n";
+    h << "\n=== MOD STATE ===\n";
+    h << "tab=" << m_tab << " method=" << m_method << " style=" << m_style << " mainMode=" << m_mainMode
+      << " colorChannels=" << int(m_colorCheck) << " objects=" << m_budget << " longSide=" << m_sizeU << "u\n";
+    h << "effective method: " << gdx::methodInfo(effectiveMethod()).name << "\n";
+    h << "settings: quality=" << mod->getSettingValue<std::string>("quality") << " max-raster=" << mod->getSettingValue<int>("max-raster")
+      << " alpha-threshold=" << mod->getSettingValue<int>("alpha-threshold") << " bleed=" << mod->getSettingValue<double>("bleed")
+      << " flip-rotation=" << int(mod->getSettingValue<bool>("flip-rotation")) << "\n";
     auto text = [&](char const* name, CCLabelBMFont* l) { h << name << ": \"" << (l && l->getString() ? l->getString() : "") << "\"\n"; };
-    text("etiqueta metodo", m_methodLabel);
-    h << "etiqueta descripcion (" << m_descLines.size() << " etiquetas, una por linea): \"" << uidump::escapeText(m_descText) << "\"\n";
-    text("estado A", m_statA);
-    text("estado B", m_statB);
-    h << "nota (" << m_noteLines.size() << " etiquetas, una por linea): \"" << uidump::escapeText(m_noteText) << "\"\n";
+    text("method label", m_methodLabel);
+    h << "description label (" << m_descLines.size() << " labels, one per line): \"" << uidump::escapeText(m_descText) << "\"\n";
+    text("status A", m_statA);
+    text("status B", m_statB);
+    h << "note (" << m_noteLines.size() << " labels, one per line): \"" << uidump::escapeText(m_noteText) << "\"\n";
 
-    h << "\n=== IMAGEN Y RESULTADO ===\n";
-    if (m_image) h << "imagen original: " << m_image->w << "x" << m_image->h << "\n"; else h << "imagen original: (ninguna)\n";
+    h << "\n=== IMAGE AND RESULT ===\n";
+    if (m_image) h << "original image: " << m_image->w << "x" << m_image->h << "\n"; else h << "original image: (none)\n";
     if (m_hasResult) {
         int outside = 0, rotated = 0; double worst = 0;
         for (auto const& s : m_result.shapes) {
@@ -414,14 +414,14 @@ std::string ExportPopup::dumpHeader() const {
             if (std::fmod(std::abs(s.rot), 90.0) > 1e-3) ++rotated;
             if (ov > 0.05) { ++outside; worst = std::max(worst, ov); }
         }
-        h << "formas=" << m_result.shapes.size() << " filasTexto=" << m_result.textRows.size() << " raster=" << m_result.rasterW << "x"
-          << m_result.rasterH << " aspecto=" << m_result.aspect << " psnr=" << m_result.psnr << " ms=" << m_result.ms << "\n";
-        h << "tieneTransparencia=" << int(m_result.hadAlpha) << " mono=" << int(m_result.mono) << " conCanales=" << int(m_result.colored)
-          << " girados=" << rotated << "\n";
-        h << "formas que SOBRESALEN de la imagen: " << outside << " (peor: " << worst << " px del raster)\n";
-        h << "nota del motor: \"" << m_result.note << "\"\n";
+        h << "shapes=" << m_result.shapes.size() << " textRows=" << m_result.textRows.size() << " raster=" << m_result.rasterW << "x"
+          << m_result.rasterH << " aspect=" << m_result.aspect << " psnr=" << m_result.psnr << " ms=" << m_result.ms << "\n";
+        h << "hasTransparency=" << int(m_result.hadAlpha) << " mono=" << int(m_result.mono) << " withChannels=" << int(m_result.colored)
+          << " rotated=" << rotated << "\n";
+        h << "shapes that STICK OUT of the image: " << outside << " (worst: " << worst << " raster px)\n";
+        h << "engine note: \"" << m_result.note << "\"\n";
     } else {
-        h << "(todavia no hay resultado)\n";
+        h << "(no result yet)\n";
     }
     return h.str();
 }
@@ -442,7 +442,7 @@ void ExportPopup::dumpUi(float) {
     try {
         text = uidump::dumpScene(dumpHeader());
     } catch (...) {
-        text = "Error interno al generar el diagnostico.\n";
+        text = "Internal error while generating the diagnostics.\n";
     }
     std::time_t now = std::time(nullptr);
     char tb[32] = "";
@@ -454,23 +454,23 @@ void ExportPopup::dumpUi(float) {
 #endif
     std::strftime(tb, sizeof tb, "%H:%M:%S", &tmv);
     s_snaps.push_back("\n\n################################################################################\n"
-                      "##### INSTANTANEA " + std::to_string(++s_snapCount) + " (" + tb + ") - motivo: " + m_dumpReason + "\n"
+                      "##### SNAPSHOT " + std::to_string(++s_snapCount) + " (" + tb + ") - reason: " + m_dumpReason + "\n"
                       "################################################################################\n" + text);
     size_t total = 0;
     for (auto const& x : s_snaps) total += x.size();
     while (total > 4000000 && s_snaps.size() > 1) { total -= s_snaps.front().size(); s_snaps.erase(s_snaps.begin()); }   // tope ~4 MB: se descartan las mas viejas
-    std::string all = "Image Exporter - diagnostico de interfaz. Instantaneas de esta sesion: " + std::to_string(s_snaps.size()) + "\n";
+    std::string all = "Image Exporter - interface diagnostics. Snapshots in this session: " + std::to_string(s_snaps.size()) + "\n";
     for (auto const& x : s_snaps) all += x;
 
     auto path = mod->getSaveDir() / "ui-dump.txt";
     auto res = utils::file::writeString(path, all);
     std::string shown = utils::string::pathToString(path);
-    if (res.isOk()) log::info("Diagnostico de interfaz guardado en {}", shown);
-    else log::error("No se pudo guardar el diagnostico de interfaz en {}", shown);
+    if (res.isOk()) log::info("Interface diagnostics saved to {}", shown);
+    else log::error("Could not save the interface diagnostics to {}", shown);
     if (!m_dumpNotified) {
         m_dumpNotified = true;
-        if (res.isOk()) Notification::create("Diagnostico guardado en:\n" + shown, NotificationIcon::Success, 6.f)->show();
-        else Notification::create("No se pudo guardar el diagnostico:\n" + shown, NotificationIcon::Error, 6.f)->show();
+        if (res.isOk()) Notification::create("Diagnostics saved to:\n" + shown, NotificationIcon::Success, 6.f)->show();
+        else Notification::create("Could not save the diagnostics:\n" + shown, NotificationIcon::Error, 6.f)->show();
     }
 }
 
@@ -479,7 +479,7 @@ void ExportPopup::dumpUi(float) {
 void ExportPopup::onPick(CCObject*) {
     auto options = file::FilePickOptions{
         std::nullopt,
-        {{"Imagenes", {"*.png", "*.jpg", "*.jpeg", "*.bmp", "*.tga", "*.gif"}}}
+        {{"Images", {"*.png", "*.jpg", "*.jpeg", "*.bmp", "*.tga", "*.gif"}}}
     };
     async::spawn(
         file::pick(file::PickMode::OpenFile, options),
@@ -487,14 +487,14 @@ void ExportPopup::onPick(CCObject*) {
             auto self = weak.lock();
             if (!self) return;
             if (!result.isOk()) {
-                self->setStatus("No se pudo abrir", "el selector de archivos");
+                self->setStatus("Could not open", "the file picker");
                 return;
             }
             auto opt = result.unwrap();
             if (!opt) return;                                    // cancelado
             auto bytes = utils::file::readBinary(opt.value());
             if (!bytes.isOk()) {
-                self->setStatus("No se pudo leer", "el archivo");
+                self->setStatus("Could not read", "the file");
                 return;
             }
             self->loadImageBytes(bytes.unwrap());
@@ -506,12 +506,12 @@ void ExportPopup::loadImageBytes(std::vector<uint8_t> const& bytes) {
     int w = 0, h = 0, c = 0;
     unsigned char* d = stbi_load_from_memory(bytes.data(), int(bytes.size()), &w, &h, &c, 4);
     if (!d) {
-        this->setStatus("No se pudo leer la imagen", "", "Formatos: PNG, JPG, BMP, TGA, GIF");
+        this->setStatus("Could not read the image", "", "Formats: PNG, JPG, BMP, TGA, GIF");
         return;
     }
     if (int64_t(w) * h > 100000000) {
         stbi_image_free(d);
-        this->setStatus("Imagen demasiado grande", "(max. 100 megapixeles)");
+        this->setStatus("Image too large", "(max. 100 megapixels)");
         return;
     }
     auto img = std::make_shared<gdx::Image>();
@@ -579,14 +579,14 @@ void ExportPopup::recompute(float) {
     job->opt = makeOptions();
     job->startMs = gdx::nowMs();
     m_job = job;
-    this->setStatus("Calculando... 0%");
+    this->setStatus("Calculating... 0%");
 
     std::thread([job]() {
         try {
             job->result = gdx::convert(*job->src, job->method, job->opt, &job->prog);
         } catch (...) {
             job->result = gdx::Result{};
-            job->result.note = "Error interno al calcular";
+            job->result.note = "Internal error while calculating";
         }
         job->done.store(true, std::memory_order_release);
     }).detach();
@@ -604,11 +604,11 @@ void ExportPopup::tick(float) {
     if (gdx::nowMs() - m_job->startMs > 90000.0) {
         m_job->prog.cancel.store(true);
         m_job = nullptr;
-        this->setStatus("Tarda demasiado", "prueba con menos objetos", "Calculo cancelado tras 90 s. Prueba otro metodo o baja el numero de objetos.");
+        this->setStatus("Taking too long", "try fewer objects", "Calculation canceled after 90 s. Try another method or lower the object count.");
         return;
     }
     char buf[48];
-    std::snprintf(buf, sizeof buf, "Calculando... %d%%", int(m_job->prog.fraction.load() * 100.f));
+    std::snprintf(buf, sizeof buf, "Calculating... %d%%", int(m_job->prog.fraction.load() * 100.f));
     this->setStatus(buf);
 }
 
@@ -616,19 +616,19 @@ void ExportPopup::applyResult(std::shared_ptr<Job> job) {
     m_result = std::move(job->result);
     m_hasResult = !m_result.shapes.empty() || !m_result.textRows.empty();
     if (!m_hasResult) {
-        this->setStatus("No se genero ningun objeto", "", m_result.note);
+        this->setStatus("No objects were generated", "", m_result.note);
         return;
     }
     // tamaño aproximado de la cadena de objetos (sin comprimir): sirve para comparar métodos
     size_t kb = gdx::toGdString(m_result, makeExportOptions()).size() / 1024;
     size_t objs = m_result.shapes.size() + m_result.textRows.size();
     char a1[96], b1[96];
-    std::snprintf(a1, sizeof a1, "%zu objetos | ~%zu KB", objs, kb);
+    std::snprintf(a1, sizeof a1, "%zu objects | ~%zu KB", objs, kb);
     if (m_result.psnr >= 0) std::snprintf(b1, sizeof b1, "%.1f dB | %.1f s", m_result.psnr, m_result.ms / 1000.0);
     else std::snprintf(b1, sizeof b1, "%.1f s", m_result.ms / 1000.0);
     this->setStatus(a1, b1, m_result.note);
     this->buildPreview();
-    m_dumpReason = "resultado calculado";
+    m_dumpReason = "result calculated";
     this->dumpUi();                                   // (solo si el ajuste esta activo) refresca el txt con el estado y el resultado
 }
 
@@ -754,11 +754,11 @@ void ExportPopup::applyChannelColorsDirect(gdx::GdExportOptions const& eo, gdx::
 
 void ExportPopup::onPlace(CCObject*) {
     if (m_job) {
-        FLAlertLayer::create("Image Exporter", "Todavia se esta calculando. Espera a que termine.", "OK")->show();
+        FLAlertLayer::create("Image Exporter", "Still calculating. Wait for it to finish.", "OK")->show();
         return;
     }
     if (!m_hasResult) {
-        FLAlertLayer::create("Image Exporter", "Primero elige una imagen.", "OK")->show();
+        FLAlertLayer::create("Image Exporter", "Choose an image first.", "OK")->show();
         return;
     }
     auto lel = LevelEditorLayer::get();
@@ -778,7 +778,7 @@ void ExportPopup::onPlace(CCObject*) {
         std::vector<int> chosen = gdx::pickFreeChannels(used, eo.paletteChannelStart, need);
         if (int(chosen.size()) < need) {
             char buf[200];
-            std::snprintf(buf, sizeof buf, "No hay suficientes canales libres: hacen falta %d y quedan %d.\nUsa menos colores en los ajustes o libera canales.",
+            std::snprintf(buf, sizeof buf, "Not enough free channels: %d needed, %d left.\nUse fewer colors in the settings or free up channels.",
                           need, int(chosen.size()));
             FLAlertLayer::create("Image Exporter", buf, "OK")->show();
             return;
@@ -787,7 +787,7 @@ void ExportPopup::onPlace(CCObject*) {
         for (int c : chosen) s_claimed.insert(c);                    // reservados para que la siguiente imagen use otros distintos
         {
             int nHigh = int(std::count_if(chosen.begin(), chosen.end(), [](int c) { return c >= gdx::kChanHighMin; }));
-            log::info("Canales asignados: {} (rango {}-{}, {} del tramo 1020+); canales ya usados antes: {}",
+            log::info("Channels assigned: {} (range {}-{}, {} from the 1020+ range); channels already in use before: {}",
                       chosen.size(), *std::min_element(chosen.begin(), chosen.end()), *std::max_element(chosen.begin(), chosen.end()), nHigh, used.size());
         }
         this->applyChannelColorsDirect(eo, cmap);                    // define los colores ANTES de crear los objetos
@@ -795,7 +795,7 @@ void ExportPopup::onPlace(CCObject*) {
 
     std::string str = gdx::toGdString(m_result, eo);
     if (str.empty()) {
-        FLAlertLayer::create("Image Exporter", "No hay objetos que colocar.", "OK")->show();
+        FLAlertLayer::create("Image Exporter", "There are no objects to place.", "OK")->show();
         return;
     }
     size_t count = m_result.shapes.size() + m_result.textRows.size();
@@ -807,10 +807,10 @@ void ExportPopup::onPlace(CCObject*) {
     char msg[128];
     if (m_result.colored && !eo.channels.empty()) {
         int lo = *std::min_element(eo.channels.begin(), eo.channels.end()), hi = *std::max_element(eo.channels.begin(), eo.channels.end());
-        if (lo <= gdx::kChanLowMax && hi >= gdx::kChanHighMin) std::snprintf(msg, sizeof msg, "Imagen colocada: %zu objetos | canales %d-%d y %d-%d", count, lo, gdx::kChanLowMax, gdx::kChanHighMin, hi);
-        else std::snprintf(msg, sizeof msg, "Imagen colocada: %zu objetos | canales %d-%d", count, lo, hi);
+        if (lo <= gdx::kChanLowMax && hi >= gdx::kChanHighMin) std::snprintf(msg, sizeof msg, "Image placed: %zu objects | channels %d-%d and %d-%d", count, lo, gdx::kChanLowMax, gdx::kChanHighMin, hi);
+        else std::snprintf(msg, sizeof msg, "Image placed: %zu objects | channels %d-%d", count, lo, hi);
     } else {
-        std::snprintf(msg, sizeof msg, "Imagen colocada: %zu objetos", count);
+        std::snprintf(msg, sizeof msg, "Image placed: %zu objects", count);
     }
     Notification::create(msg, NotificationIcon::Success, 2.5f)->show();
     this->onClose(nullptr);
@@ -818,5 +818,5 @@ void ExportPopup::onPlace(CCObject*) {
 
 void ExportPopup::onInfo(CCObject*) {
     if (auto* info = InfoPopup::create()) info->show();
-    this->dumpUiAfter("cuadro de info abierto", 1.0f);
+    this->dumpUiAfter("info box opened", 1.0f);
 }

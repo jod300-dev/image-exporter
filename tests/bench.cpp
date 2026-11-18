@@ -31,12 +31,12 @@ static double ssim(const Image& a, const Image& b) {
 }
 
 int main(int argc, char** argv) {
-    if (argc < 4) { std::printf("uso: bench presupuestos metodos img...\n"); return 1; }
+    if (argc < 4) { std::printf("usage: bench budgets methods img...\n"); return 1; }
     std::vector<int> budgets, methods; { std::stringstream s(argv[1]); std::string t; while (std::getline(s, t, ',')) budgets.push_back(std::atoi(t.c_str())); }
     { std::stringstream s(argv[2]); std::string t; while (std::getline(s, t, ',')) methods.push_back(std::atoi(t.c_str())); }
     Options opt; if (const char* q = std::getenv("GDX_QUALITY")) opt.quality = std::atoi(q);
     if (const char* f = std::getenv("GDX_HYBF")) opt.hybridFraction = float(std::atof(f));
-    std::printf("%-14s %6s", "imagen", "obj");
+    std::printf("%-14s %6s", "image", "obj");
     for (int m : methods) std::printf(" | m%d PSNR  SSIM   ms", m + 1);
     std::printf("\n");
     std::vector<double> accP(methods.size() * budgets.size(), 0), accS(methods.size() * budgets.size(), 0); int nimg = 0;
@@ -60,9 +60,9 @@ int main(int argc, char** argv) {
             std::printf("\n");
         }
     }
-    std::printf("\nMEDIA (%d imagenes):\n", nimg);
+    std::printf("\nAVERAGE (%d images):\n", nimg);
     for (size_t bi = 0; bi < budgets.size(); ++bi) {
-        std::printf("%-14s %6d", "media", budgets[bi]);
+        std::printf("%-14s %6d", "average", budgets[bi]);
         for (size_t mi = 0; mi < methods.size(); ++mi) std::printf(" | %5.2f %5.3f      ", accP[mi * budgets.size() + bi] / nimg, accS[mi * budgets.size() + bi] / nimg);
         std::printf("\n");
     }

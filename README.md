@@ -1,181 +1,160 @@
-# Image Exporter (mod de Geode)
+# Image Exporter (Geode mod)
 
-Convierte una imagen en objetos de Geometry Dash dentro del editor, con **8 metodos normales + 10 estilos monocromos** y un tope duro de **10.000 objetos**.
-Base tecnica: el mod *Art importer* (Grian/CelestialGecko): objeto `3092` (cuadrado de 1 u), color por HSV absoluto sobre el canal 1010 y `createObjectsFromString`.
+Turns an image into Geometry Dash objects inside the editor, with **8 normal methods + 10 monochrome styles** and a hard cap of **10,000 objects**.
+Technical basis: the *Art importer* mod (Grian/CelestialGecko): object `3092` (a 1 u square), color through absolute HSV on channel 1010, and `createObjectsFromString`.
 
-## Los 8 metodos
+## The 8 methods
 
-| # | Metodo | Idea | Mejor para |
-|---|--------|------|-----------|
-| 1 | Cuadricula uniforme | 1 celda = 1 objeto, color medio | pixel art, rapido |
-| 2 | Quadtree adaptativo | divide en 4 solo donde hay detalle (mejor-primero, usa justo el limite) | general |
-| 3 | BSP adaptativo (k-d) | corte optimo en X o Y, rectangulos de cualquier proporcion | **fotos** (rapido) |
-| 4 | Piramide de capas | bloque grande + capas de detalle solo donde el color difiere (criterio rate-distortion) | imagenes con zonas lisas |
-| 5 | Regiones por paleta | cuantiza a paleta (median-cut, o exacta si <=256 colores) y fusiona zonas en rectangulos voraces; busca sola resolucion/colores | **ilustraciones y pixel art** (muy pocos objetos) |
-| 6 | Franjas horizontales | tiras por fila con tolerancia de color; elige sola filas/tolerancia | estilo "escaneo" |
-| 7 | Rectangulos rotados | busqueda aleatoria + escalada de colina guiada por el mapa de error (estilo Geometrize) | look pictorico |
-| 8 | Hibrido BSP + rotados | base BSP (55 %) y el resto en rectangulos rotados sobre los residuos | **maxima calidad** |
+| # | Method | Idea | Best for |
+|---|--------|------|----------|
+| 1 | Uniform grid | 1 cell = 1 object, average color | pixel art, fast |
+| 2 | Adaptive quadtree | splits in 4 only where there is detail (best-first, uses exactly the limit) | general |
+| 3 | Adaptive BSP (k-d) | optimal cut in X or Y, rectangles of any proportion | **photos** (fast) |
+| 4 | Layer pyramid | big block + detail layers only where the color differs (rate-distortion criterion) | images with flat areas |
+| 5 | Palette regions | quantizes to a palette (median-cut, or exact if <= 256 colors) and merges areas into greedy rectangles; finds the resolution/colors by itself | **illustrations and pixel art** (very few objects) |
+| 6 | Horizontal strips | per-row strips with color tolerance; picks rows/tolerance by itself | "scanline" style |
+| 7 | Rotated rectangles | random search + hill climbing guided by the error map (Geometrize style) | painterly look |
+| 8 | Hybrid BSP + rotated | BSP base (15 %) and the rest as rotated rectangles over the leftovers | **maximum quality** |
 
-Todos garantizan `objetos <= limite` (ajustable de 500 a 10.000 en la ventana). Con transparencia, 7 y 8 pasan solos a BSP (los rectangulos solapados no pueden dejar huecos) y lo avisa.
+All of them guarantee `objects <= limit` (adjustable from 500 to 10,000 in the window). With transparency, 7 and 8 switch to BSP by themselves (overlapping rectangles cannot leave gaps) and the window tells you so.
 
-## Estilos monocromos (9 metodos extra, seccion aparte en la ventana)
+## Monochrome styles (10 extra styles, separate "Light" tab in the window)
 
-Pensados para ser **ligeros**: tinta negra (canal 1010) sobre papel blanco (canal 1011), **sin HSV por objeto**, y normalmente con bastantes menos objetos que el maximo. En la ventana estan debajo de la parte normal; elegir un metodo normal desactiva el estilo y viceversa. Ajuste "Tinta blanca sobre negro" para fondos oscuros.
+Designed to be **light**: black ink (channel 1010) on white paper (channel 1011), **no per-object HSV keys**, and usually far fewer objects than the maximum. The object string is ~25 % shorter than with HSV, and ASCII is about 20 times smaller. Choosing a normal method disables the style and vice versa. The setting *White ink on black* is for dark backgrounds.
 
-| # | Estilo | Idea | Objetos (foto, limite 10.000) |
-|---|--------|------|------|
-| 9 | Halftone (diamantes) | cuadrados girados 45 grados, tamano segun oscuridad | 9.872 |
-| 10 | Grabado de lineas | lineas paralelas con grosor variable | 6.537 |
-| 11 | Sombreado cruzado | capas de rayas a 45/135/0/90 grados segun el tono | 2.071 |
-| 12 | Estarcido | puntos mas densos donde es oscuro | 9.977 |
-| 13 | Tramado Bayer | blanco y negro ordenado, fusionado en rectangulos | 9.891 |
-| 14 | Tinta (comic) | umbral adaptativo, manchas solidas | 10.000 (7.934 en la pintura) |
-| 15 | Boceto de trazos | trazos cortos sobre los bordes | 7.212 |
-| 16 | Espiral | espiral de grosor variable | 9.963 |
-| 17 | Diagonales 10 PRINT | una "/" o "\\" por celda segun la estructura local | 9.987 |
+| # | Style | Idea |
+|---|-------|------|
+| 9 | Halftone (diamonds) | squares rotated 45 degrees; the size follows darkness |
+| 10 | Line engraving | parallel lines of varying thickness per segment |
+| 11 | Cross-hatching | stripes at 45, 135, 0 and 90 degrees depending on tone |
+| 12 | Stippling (dots) | dots with density proportional to darkness (weighted Poisson) |
+| 13 | Bayer dithering | ordered black/white, merged into rectangles |
+| 14 | Ink (comic) | adaptive threshold: solid blots, very few objects |
+| 15 | Stroke sketch | short oriented strokes on the edges (Sobel + non-maximum suppression) |
+| 16 | Spiral | Archimedean spiral of varying thickness |
+| 17 | 10 PRINT diagonals | one / or \ per cell depending on local structure |
+| 18 | ASCII art | **one text row = one text object (914)**; the whole image in ~50-200 objects |
 
-Cada estilo tiene una separacion minima visible, asi que con presupuestos grandes a veces usa menos objetos de los permitidos (p. ej. el sombreado cruzado).
+Each style has a minimum visible spacing, so **with a 10,000 limit they usually use quite a bit less** (cross-hatching ~2,000, engraving ~4,600-6,500, ASCII ~150).
+Useful settings: *White ink on black*, *Black/White channel*, *ASCII: character width* and *ASCII: character height/width*.
 
-### Sobre el borrado automatico de niveles
-No he encontrado informacion publica sobre la regla exacta de los servidores, **asi que no puedo garantizar que un nivel no sea borrado**. Lo que hace el mod es atacar las causas que mencionas: menos objetos, sin HSV en los estilos monocromos, y un indicador **"~KB"** en la ventana con el tamano aproximado de la cadena del nivel (sin comprimir) para que veas cuanto pesa cada opcion. Los metodos normales con HSV rondan 800-900 KB a 10.000 objetos; los monocromos entre ~130 y ~680 KB. Para ir aun mas ligero, baja el limite de objetos. Prueba primero con un nivel pequeno.
+Object counts for a photo at the 10,000 limit: halftone 9,872 | engraving 6,537 | cross-hatching 2,071 | stippling 9,977 | Bayer 9,891 | ink 10,000 (7,934 on the painting) | strokes 7,212 | spiral 9,963 | 10 PRINT 9,987.
 
-## Estilos monocromos (seccion de abajo de la ventana)
+### About automatic level deletion
+I have found no public information about the servers' exact rule, **so I cannot guarantee that a level will not be deleted**. What the mod does is attack the causes people mention: fewer objects, no HSV in the monochrome styles, and a **"~KB"** indicator in the window with the approximate size of the (uncompressed) level string so you can see how heavy each option is. The normal HSV methods are around 800-900 KB at 10,000 objects; the monochrome ones between ~130 and ~680 KB. To go even lighter, lower the object limit. Try a small level first.
 
-Pensados para ser **ligeros**: tinta negra (canal 1010) sobre papel blanco (canal 1011), **sin claves de HSV por objeto** y, en general, muchos menos objetos. La cadena de objetos es ~25 % mas corta que con HSV, y el ASCII es unas 20 veces mas pequeno.
+### Color channels, grays and "Light styles" in color
 
-| # | Estilo | Idea |
-|---|--------|------|
-| 9 | Halftone (diamantes) | cuadrados girados 45 grados; el tamano sigue la oscuridad |
-| 10 | Grabado de lineas | lineas paralelas de grosor variable por tramos |
-| 11 | Sombreado cruzado | rayas a 45, 135, 0 y 90 grados segun el tono |
-| 12 | Estarcido | puntos con densidad proporcional a la oscuridad (Poisson ponderado) |
-| 13 | Tramado Bayer | blanco/negro ordenado, fusionado en rectangulos |
-| 14 | Tinta (comic) | umbral adaptativo: manchas solidas, muy pocos objetos |
-| 15 | Boceto de trazos | trazos cortos orientados sobre los bordes (Sobel + supresion de no-maximos) |
-| 16 | Espiral | espiral de Arquimedes de grosor variable |
-| 17 | Diagonales 10 PRINT | una diagonal / o \ por celda segun la estructura local |
-| 18 | Arte ASCII | **una fila de texto = un objeto de texto (914)**; la imagen entera en ~50-200 objetos |
+**No triggers.** The colors are written directly into the level's color settings (what the editor's *Base Color* selector reads) and each object only carries its channel (`21,<channel>`): no HSV and no extra objects.
 
-Cada estilo tiene una separacion minima visible, asi que **con 10.000 de limite suelen usar bastantes menos** (sombreado cruzado ~2.000, grabado ~4.600-6.500, ASCII ~150).
-Ajustes utiles: *Tinta blanca sobre fondo negro*, *Canal negro/blanco*, *ASCII: ancho de caracter* y *ASCII: alto/ancho de caracter*.
+**Free channels.** Before placing, the mod checks which channels the level uses (the base and detail color of **all objects**, the already-defined colors, and channels copied by another channel) and spreads the image's colors **only over free channels**, starting at *First palette channel* (default 2). If channels 2-999 run out, the allocation **continues at 1020 and goes up to 9999** (1000-1019 are special GD channels -BG, G1, G2, black, white...- and are never used). **Channel 1 is never used.** The mod also remembers the channels it handed out in the open editor, so placing a second image takes different channels and **does not overwrite** the colors of the previous one. If there are not enough, it warns you and places nothing.
 
-### Diagnostico de la interfaz (v1.1.1)
+**Methods 1-8: three checks** (none checked = HSV color, as always):
+* *Channels*: the colors are reduced to a palette (default 64, adjustable) and each color is a channel.
+* *Gray HSV*: the image in grayscale using HSV.
+* *Gray channels*: the same, but with channels (up to 32 gray tones).
 
-Si la ventana se ve con errores, activa en Ajustes **"Guardar diagnostico de la interfaz (txt)"**. Al abrir la ventana (y cada vez que se calcula una imagen) el mod escribe `ui-dump.txt` en su carpeta de guardado; la ruta exacta aparece en una notificacion. El txt incluye la version, el tamano de pantalla y el factor de escala, la posicion/ancla/tamano/escala y la **caja real en pantalla** de cada elemento, los **solapes** entre textos y botones, lo que se **sale del marco**, el estado del mod y los datos del ultimo resultado (por ejemplo cuantas formas sobresalen de la imagen). Enviando ese archivo se puede ver con exactitud como genera GD la ventana.
+**Light styles (9-18):**
+* By default they are black and white on **2 free channels** (black and white). With the setting *Black and white with channels 1010/1011* they use the special channels.
+* With the *Colors in channels (no HSV)* check they come out **in color and cleaner**: a **color mosaic** (BSP) with the image's tone goes underneath, and the style goes on top with a darker version of the same tone. That way there are no transparent gaps or stray white/black dots. The base compensates for the real ink coverage of each area, and long strokes are split where the color changes.
+* Half of the palette channels (*Light styles: color channels*, default 48) are for the base and the other half for the ink.
 
-### Canales de color, grises y "Estilos ligeros" en color
+**Z-order is always exported** (key 25) and the light styles put the base/paper on a layer below the ink (key 24). If key 25 is missing, GD uses object 3092's default z and the paper can end up on top: that caused the blank images.
 
-**Nada de triggers.** Los colores se escriben directamente en los ajustes de color del nivel (lo que lee el selector *Base Color* del editor) y cada objeto solo lleva su canal (`21,<canal>`): sin HSV y sin objetos extra.
+* **Unverified in GD:** defining the colors uses `GJEffectManager::getColorAction`, `getAllColorActions` and the `ColorAction` fields (per the 2.2081 bindings); channel detection uses `GameObject::m_baseColor/m_detailColor`.
 
-**Canales libres.** Antes de colocar, el mod mira que canales usa el nivel (el color base y de detalle de **todos los objetos** y los colores ya definidos) y reparte los colores de la imagen **solo en canales libres**, empezando en *Primer canal de la paleta* (por defecto 2). Si se acaban los canales 2-999, el reparto **continua en el 1020 y sigue hasta el 9999** (los 1000-1019 son canales especiales de GD -BG, G1, G2, negro, blanco...- y no se usan). **El canal 1 nunca se usa.** Al colocar una segunda imagen coge otros canales distintos, asi que **no sobrescribe** los colores de la anterior. Si no quedan suficientes, avisa y no coloca nada.
+### About ASCII (read this)
+* The text object is **914**, with the text in base64 in key **31** (format taken from community libraries, not tested here in GD).
+* **Rows are split into text objects** of *ASCII: characters per object* (60 by default; 14 or fewer in color) placed next to each other, so GD does not clip or break up long rows. There are up to 400 columns (260 in color).
+* In color, each text piece uses the tone of its area (its own channel) over a color mosaic.
+* **The font is a setting of the whole level**, not of the object: pick a monospaced one (e.g. font 5, Joystix).
+* You have to **calibrate** it per font: *character width* (units at scale 1; default 24, an estimate), *height/width* (default 1.0) and, if needed, *letter spacing* (key 488). Place a test row, measure and adjust; the pieces are placed using that width, so a badly calibrated width leaves gaps or overlaps between pieces.
 
-**Metodos 1-8: tres checks** (ninguno marcado = HSV a color, como siempre):
-* *Canales de color*: los colores se reducen a una paleta (por defecto 64, ajustable) y cada color es un canal.
-* *Gris (HSV)*: la imagen en escala de grises usando HSV.
-* *Gris (canales)*: lo mismo, pero con canales (hasta 32 tonos de gris).
+## The window (430x288, fits in GD's 320 screen height)
 
-**Estilos ligeros (9-18):**
-* Por defecto son blanco y negro en **2 canales libres** (negro y blanco). Con el ajuste *Blanco y negro con canales 1010/1011* usan los canales especiales.
-* Con el check *Colores en canales (sin HSV)* salen **a color y mas limpios**: debajo va un **mosaico de color** (BSP) con el tono de la imagen, y encima el estilo con una version mas oscura del mismo tono. Asi no hay huecos transparentes ni puntos blancos/negros sueltos. La base compensa la cobertura real de tinta de cada zona, y los trazos largos se parten donde cambia el color.
-* La mitad de los canales de la paleta (*Estilos ligeros: canales en color*, por defecto 48) son para la base y la otra mitad para la tinta.
+* **Left:** preview (140x140) and status: objects, approximate string size (`~KB`), quality in dB and time. *Settings* sits below it.
+* **Right:** two **tabs**, *Main* (methods 1-8) and *Light* (styles 9-18); arrows to switch method, with its description; two **sliders** (*Objects*, 500 to 10,000 in steps of 100, and *Long side*, 150 to 6,000 u); and a **single color row** that changes with the tab (*Main*: Channels / Gray HSV / Gray channels, none = HSV color; *Light*: Colors in channels).
+* **Buttons:** *Image*, *Place*, *i* (help, opens a small info box) and *Settings* (opens the mod's settings).
+* The window remembers the last configuration. The calculation is redone 0.35 s after you release a slider.
 
-**El z-order se exporta siempre** (clave 25) y los estilos ligeros ponen la base/papel en una capa inferior a la tinta (clave 24). Si falta la clave 25, GD usa el z por defecto del objeto 3092 y el papel puede quedar encima: eso causaba las imagenes en blanco.
+### Interface diagnostics
+If the window looks wrong, enable **"Save interface diagnostics (txt)"** in Settings. The mod then writes `ui-dump.txt` to its save folder; the exact path appears in a notification. It records a snapshot when the window opens, when you switch tabs, when you open the info box, when you open settings and when an image is calculated. The txt includes the version, screen size and scale factor, the full node tree of every open window (position/anchor/size/scale/skew/rotation/color/opacity and the **real on-screen box**), the literal texts with the glyphs the font does not have, the real spacing between lines, the **overlaps** between texts and buttons, what falls **outside the frame**, the color-channel state, the mod state and the last result data. Sending that file shows exactly how GD builds the window.
 
-* **Sin verificar en GD:** definir los colores usa `GJEffectManager::getColorAction`, `getAllColorActions` y los campos de `ColorAction` (segun los bindings 2.2081); la deteccion de canales usa `GameObject::m_baseColor/m_detailColor`.
+## Quality of the 8 main methods by object count
 
-### Sobre el ASCII (leer)
-* El objeto de texto es el **914**, con el texto en base64 en la clave **31** (formato tomado de librerias de la comunidad, no probado aqui en GD).
-* **Las filas se parten en objetos de texto** de *ASCII: caracteres por objeto* (60 por defecto; 14 o menos en color) colocados uno junto a otro, para que GD no recorte ni entrecorte las filas largas. Hay hasta 400 columnas (260 en color).
-* En color, cada tramo de texto usa el tono de su zona (canal propio) sobre un mosaico de color.
-* **La fuente es un ajuste del nivel entero**, no del objeto: elige una monoespaciada (p. ej. la fuente 5, Joystix).
-* Hay que **calibrar** segun la fuente: *ancho de caracter* (unidades con escala 1; por defecto 24, estimacion), *alto/ancho* (por defecto 1.0) y, si hace falta, *espaciado de letras* (clave 488). Pon una fila de prueba, mide y ajusta; los trozos se colocan con ese ancho, asi que un ancho mal calibrado deja huecos o solapes entre trozos.
+Measured with PSNR and SSIM (luma) against a common 512 px reference, on 4 images (photo, painting, flat illustration and logo) at 1,000 / 3,000 / 10,000 objects. PSNR in dB; in parentheses, before that version:
 
-### Sobre los borrados automaticos de RobTop
-No he encontrado informacion publica sobre la regla exacta, asi que **no hay garantia** de que un nivel no se borre. Lo que si hace el mod es atacar lo que se sabe que pesa: menos objetos, sin HSV por objeto y un indicador (`~KB`) del tamano de la cadena para comparar metodos. Si vas a subir un nivel, prueba antes con uno pequeno.
-
-## La ventana (430x268, cabe en los 320 de alto de la pantalla de GD)
-
-* **Izquierda:** vista previa (140x140) y estado: objetos, tamano aproximado de la cadena (`~KB`), calidad en dB y tiempo.
-* **Derecha:** dos **pestanas**, *Principales* (metodos 1-8) y *Ligeros* (estilos 9-18); flechas para cambiar de metodo con su descripcion en dos lineas; dos **sliders** (*Objetos*, de 500 a 10.000 en pasos de 100, y *Lado largo*, de 150 a 6.000 u); y una **sola fila de color** que cambia con la pestana (*Principales*: Canales / Gris HSV / Gris canales, ninguno = HSV a color; *Ligeros*: Colores en canales).
-* **Botones:** *Imagen*, *Colocar*, *i* (ayuda) y *Ajustes* (abre los ajustes del mod).
-* La ventana recuerda la ultima configuracion. El calculo se rehace 0,35 s despues de soltar un slider.
-
-## Calidad de los 8 metodos principales segun el numero de objetos
-
-Medido con PSNR y SSIM (luma) contra una referencia comun a 512 px, en 4 imagenes (foto, pintura, ilustracion plana y logo) a 1.000 / 3.000 / 10.000 objetos. PSNR en dB; entre parentesis, antes de esta version:
-
-| Metodo | 1.000 | 3.000 | 10.000 |
+| Method | 1,000 | 3,000 | 10,000 |
 |---|---|---|---|
-| 3 BSP | 26,9 (26,7) | 34,2 (33,7) | 50,6 (50,3) |
-| 4 Piramide | 20,1 (19,7) | 23,8 (23,3) | 31,8 (30,8) |
-| 7 Rectangulos rotados | **30,4** (20,9) | **36,3** (23,3) | **44,9** (26,3) |
-| 8 Hibrido | 30,0 (27,3) | 37,0 (32,9) | 51,3 (45,8) |
+| 3 BSP | 26.9 (26.7) | 34.2 (33.7) | 50.6 (50.3) |
+| 4 Pyramid | 20.1 (19.7) | 23.8 (23.3) | 31.8 (30.8) |
+| 7 Rotated rectangles | **30.4** (20.9) | **36.3** (23.3) | **44.9** (26.3) |
+| 8 Hybrid | 30.0 (27.3) | 37.0 (32.9) | 51.3 (45.8) |
 
-Que cambio:
-* **Recolor por visibilidad:** en los metodos con capas (Piramide, 7 y 8) cada forma toma como color la media de los pixeles que realmente se ven, y las formas totalmente tapadas por otras se **eliminan y su presupuesto se reinvierte** en mas formas (hasta 3 rondas).
-* **Rectangulos rotados** parte ahora de una base BSP gruesa (6 %) y usa la misma resolucion interna que el Hibrido; antes empezaba de un fondo plano y convergia muy despacio.
-* **Hibrido:** base BSP del 15 % (medido: entre 10 % y 35 % da lo mismo; mas base empeora). Si el BSP con todo el presupuesto ya es casi perfecto (>= 38 dB: logos, ilustraciones), devuelve el BSP.
-* **BSP y Quadtree:** la prioridad mira dos niveles (un corte pobre que abre otro muy valioso sube en la cola). Se probo ademas una fase de intercambios fusionar+dividir y **no mejoraba**, asi que se descarto: el voraz ya es casi optimo en esa familia.
-* **Franjas:** elige filas o columnas segun lo que comprima mejor.
-* **Calidad de busqueda:** por defecto *Alto* (antes *Normal*), nuevo nivel *Maximo*, y con 3.000 objetos o menos se sube un nivel solo (sobra tiempo). *Alto* aporta ~+0,9 dB y +0,02 SSIM frente a *Normal* por ~1,7x de tiempo; con 10.000 objetos el 7 y el 8 tardan hasta ~5 s en una imagen de 512 px.
-* Sin cambios apreciables: Cuadricula (ya es el promedio exacto), Regiones.
+What changed:
+* **Visibility recoloring:** in the layered methods (Pyramid, 7 and 8) each shape takes as its color the average of the pixels that are really visible, and shapes completely covered by others are **removed and their budget is reinvested** into more shapes (up to 3 rounds).
+* **Rotated rectangles** now start from a coarse BSP base (6 %) and use the same internal resolution as the Hybrid; before, it started from a flat background and converged very slowly.
+* **Hybrid:** 15 % BSP base (measured: anything between 10 % and 35 % gives the same; more base is worse). If BSP with the whole budget is already almost perfect (>= 38 dB: logos, illustrations), it returns the BSP.
+* **BSP and Quadtree:** the priority looks two levels ahead (a poor cut that opens a very valuable one moves up the queue). A merge+split swap phase was also tried and **did not improve things**, so it was dropped: the greedy approach is already almost optimal in that family.
+* **Strips:** picks rows or columns depending on what compresses better.
+* **Search quality:** *High* by default (before, *Normal*), a new *Maximum* level, and with 3,000 objects or fewer it goes up one level by itself (there is time to spare). *High* gives ~+0.9 dB and +0.02 SSIM over *Normal* for ~1.7x the time; at 10,000 objects, 7 and 8 take up to ~5 s on a 512 px image.
+* No noticeable changes: Grid (already the exact average), Regions.
 
-## Correcciones tras la primera prueba en el juego
+## Fixes after the first test in the game
 
-* **La Piramide de capas se quedaba en un % para siempre** con imagenes transparentes y pocos objetos (un sprite con mucho borde). Los bordes obligaban a un minimo de objetos que no dependia del umbral, y ese minimo superaba el presupuesto; el bucle de seguridad subia el umbral sin fin. Ahora las celdas mixtas (parte opaca, parte transparente) se tratan por mayoria cuando el minimo no cabe, como hace el BSP, y todos los bucles de seguridad tienen tope. Se reprodujo antes de arreglarlo (cuelgue con 1.500, 3.000 y 6.000 objetos) y se comprobo despues con 500, 1.500, 3.000 y 10.000 en los 4 modos de color.
-* **Aviso de seguridad:** si un calculo pasa de 90 s se cancela y la ventana lo dice.
-* **Interfaz:** la descripcion se salia de la ventana (ahora se mide el texto y se parte en lineas a mano), las pestanas tapaban el titulo (son mas pequenas), y *Ajustes* quedaba fuera del marco (ahora *Ajustes* e *i* estan arriba a la derecha).
+* **The Layer pyramid got stuck at a percentage forever** with transparent images and few objects (a sprite with a lot of border). The borders forced a minimum number of objects that did not depend on the threshold, and that minimum exceeded the budget; the safety loop raised the threshold endlessly. Now mixed cells (partly opaque, partly transparent) are handled by majority when the minimum does not fit, as BSP does, and all the safety loops have a cap. It was reproduced before the fix (hang with 1,500, 3,000 and 6,000 objects) and checked afterwards with 500, 1,500, 3,000 and 10,000 in the 4 color modes.
+* **Safety notice:** if a calculation goes past 90 s it is canceled and the window says so.
+* **Interface:** the description ran out of the window (now the text is measured and wrapped by hand), the tabs covered the title (they are smaller), and *Settings* was outside the frame.
 
-## Estructura
+## Structure
 
 ```
-src/engine/   motor de conversion SIN dependencias de Geode (core, partition, regions, geometrize, mono, palette, lightcolor, gdexport)
-src/ui/       ventana (Popup): metodo, objetos, tamano, vista previa, colocar
-src/main.cpp  boton en la pestana Edit (hook de EditorUI::createMoveMenu)
-tests/        engine_test.cpp (validacion) y bench.cpp (PSNR/SSIM por metodo y presupuesto)
-.github/      workflow oficial de geode-sdk/build-geode-mod
+src/engine/   conversion engine WITHOUT Geode dependencies (core, partition, regions, geometrize, mono, palette, lightcolor, gdexport)
+src/ui/       window (Popup): method, objects, size, preview, place; info box; UI diagnostics
+src/main.cpp  button in the Edit tab (hook of EditorUI::createMoveMenu)
+tests/        engine_test.cpp (validation) and bench.cpp (PSNR/SSIM per method and budget)
+.github/      official geode-sdk/build-geode-mod workflow
 ```
 
-## Compilar
+## Building
 
-**Opcion facil (recomendada): GitHub Actions.** Sube la carpeta a un repo de GitHub; el workflow compila para Windows, macOS, iOS y Android y deja el `.geode` combinado como artefacto ("Build Output").
+**Easy option (recommended): GitHub Actions.** Upload the folder to a GitHub repo; the workflow builds for Windows, macOS, iOS and Android and leaves the combined `.geode` as an artifact ("Build Output").
 
-**Local:** instala la [Geode CLI](https://docs.geode-sdk.org/getting-started/geode-cli) y el SDK, y en esta carpeta ejecuta `geode build`.
+**Local:** install the [Geode CLI](https://docs.geode-sdk.org/getting-started/geode-cli) and the SDK, and run `geode build` in this folder.
 
-`mod.json` apunta a **Geode 5.11.2 / GD 2.2081** (el ultimo release del SDK). Si tu juego/loader es otro, cambia `geode` y `gd` en `mod.json` (tu *Art importer* usaba 5.3.0, tambien con 2.2081).
+`mod.json` points at **Geode 5.11.2 / GD 2.2081**. If your game/loader is different, change `geode` and `gd` in `mod.json` (your *Art importer* used 5.3.0, also with 2.2081).
 
-## Probar el motor sin Geode
+## Testing the engine without Geode
 
 ```
 g++ -O2 -std=c++20 -Iinclude -Isrc/engine tests/engine_test.cpp -o engine_test
-./engine_test imagen.png 10000 carpeta_salida all
+./engine_test image.png 10000 output_folder all
 ```
-Comprueba para cada metodo: objetos <= limite, calidad (PSNR) y que la cadena de GD generada, reinterpretada, reproduce el mismo dibujo.
+For each method it checks: objects <= limit, quality (PSNR), and that the generated GD string, when reinterpreted, reproduces the same drawing.
 
-## Resultados medidos (10.000 objetos)
+## Measured results (10,000 objects)
 
-PSNR (dB) contra la imagen reducida a 512 px; en la pintura (1000x1000) y la foto (1024x768):
+PSNR (dB) against the image reduced to 512 px; on the painting (1000x1000) and the photo (1024x768):
 
-| Metodo | Pintura | Foto | Tiempo |
+| Method | Painting | Photo | Time |
 |---|---|---|---|
-| 1 Cuadricula | 22,6 | 22,2 | ~15 ms |
-| 2 Quadtree | 26,6 | 23,1 | ~40 ms |
-| 3 BSP | 30,8 | 24,8 | ~55 ms |
-| 4 Piramide | 26,4 | 23,6 | ~65 ms |
-| 5 Regiones | 25,4 | 22,5 | ~170 ms |
-| 6 Franjas | 27,5 | 23,7 | ~250 ms |
-| 7 Rotados | 26,4 | 24,4 | ~1,5 s |
-| 8 Hibrido | **32,4** | **25,6** | ~1,2 s |
+| 1 Grid | 22.6 | 22.2 | ~15 ms |
+| 2 Quadtree | 26.6 | 23.1 | ~40 ms |
+| 3 BSP | 30.8 | 24.8 | ~55 ms |
+| 4 Pyramid | 26.4 | 23.6 | ~65 ms |
+| 5 Regions | 25.4 | 22.5 | ~170 ms |
+| 6 Strips | 27.5 | 23.7 | ~250 ms |
+| 7 Rotated | 26.4 | 24.4 | ~1.5 s |
+| 8 Hybrid | **32.4** | **25.6** | ~1.2 s |
 
-En ilustracion plana y pixel art la calidad es casi sin perdida con muchos menos objetos (p. ej. imagen plana 900x600: Regiones 1.796 objetos, Hibrido 2.221; pixel art 64x64: Regiones 99 objetos).
-Tiempos medidos en 1 nucleo; una imagen de 4000x3000 tarda <= 1,6 s en cualquier metodo.
+On flat illustration and pixel art the quality is nearly lossless with far fewer objects (e.g. a 900x600 flat image: Regions 1,796 objects, Hybrid 2,221; 64x64 pixel art: Regions 99 objects).
+Times measured on 1 core; a 4000x3000 image takes <= 1.6 s in any method.
 
-## Lo que NO esta verificado (leer antes de usar)
+## What is NOT verified (read before using)
 
-* **El codigo de Geode (src/ui, src/main.cpp) no se ha compilado ni probado dentro del juego.** Se escribio contra las cabeceras reales del SDK 5.11.2 y los bindings de GD 2.2091, y se comprobo su sintaxis contra un mock minimo, pero la primera compilacion real puede pedir algun ajuste menor.
-* **Canal blanco 1011:** los estilos monocromos usan el canal 1010 (negro, el mismo del Art importer) y el 1011 como blanco; el 1011 no lo he podido comprobar en el juego. Si el papel no sale blanco, cambia el ajuste "Canal blanco".
-* Los estilos monocromos asumen que el **canal 1011 es blanco** (y el 1010 negro, como usa el Art importer). Si el blanco no se ve bien, cambia *Canal blanco* en los ajustes.
-* El ASCII depende de la fuente del nivel y de la calibracion descrita arriba.
-* El sentido de giro de los rectangulos rotados (metodos 7 y 8) sigue la convencion de cocos2d (horario). Si salen girados al reves, activa el ajuste **"Invertir giro"**.
-* El objeto 3092 con escala X/Y (claves 128/129) y el color HSV se toman del *Art importer*, que funciona; no se han probado aqui en GD.
-* La importacion **no se puede deshacer** (como en el Art importer); guarda el nivel antes. Los objetos quedan seleccionados para moverlos o borrarlos.
+* **The Geode code (src/ui, src/main.cpp) has not been compiled or tested inside the game.** It was written against the real SDK 5.11.2 headers and the GD 2.2091 bindings, and its syntax was checked against a minimal mock, but the first real build may need a minor tweak.
+* **White channel 1011:** the monochrome styles use channel 1010 (black, the same as Art importer) and 1011 as white; I could not check 1011 in the game. If the paper does not come out white, change the *White channel* setting.
+* ASCII depends on the level's font and on the calibration described above.
+* The rotation direction of the rotated rectangles (methods 7 and 8) follows the cocos2d convention (clockwise). If they come out rotated the wrong way, enable **"Flip rotation"**.
+* Object 3092 with X/Y scale (keys 128/129) and the HSV color are taken from *Art importer*, which works; they have not been tested here in GD.
+* The import **cannot be undone** (as in Art importer); save the level first. The objects are left selected so you can move or delete them.

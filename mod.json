@@ -8,9 +8,9 @@
 	},
 	"id": "patasma.image_exporter",
 	"name": "Image Exporter",
-	"version": "v1.1.5",
+	"version": "v1.1.6",
 	"developer": "Patasma",
-	"description": "Importa imagenes al editor con 8 metodos y 10 estilos monocromos ligeros (max. 10.000 objetos).",
+	"description": "Imports images into the editor with 8 methods and 10 light monochrome styles (max. 10,000 objects).",
 	"resources": {
 		"spritesheets": {
 			"ExportBtn": [
@@ -20,39 +20,39 @@
 	},
 	"settings": {
 		"title-render": {
-			"name": "Calidad y resultado",
+			"name": "Quality and result",
 			"type": "title"
 		},
 		"quality": {
 			"type": "string",
-			"default": "Alto",
-			"name": "Calidad de calculo (metodos 7 y 8)",
+			"default": "High",
+			"name": "Calculation quality (methods 7 and 8)",
 			"one-of": [
-				"Rapido",
+				"Fast",
 				"Normal",
-				"Alto",
-				"Maximo"
+				"High",
+				"Maximum"
 			],
-			"description": "Cuantos candidatos prueba por cada rectangulo girado. <cy>Alto</c> es el predeterminado; <cy>Maximo</c> es el mejor pero tarda mas. Con 3.000 objetos o menos se sube un nivel solo, porque sobra tiempo."
+			"description": "How many candidates are tried for each rotated rectangle. <cy>High</c> is the default; <cy>Maximum</c> is the best but slower. With 3,000 objects or fewer it goes up one level automatically, because there is time to spare."
 		},
 		"max-raster": {
 			"type": "int",
 			"default": 768,
 			"min": 128,
 			"max": 1024,
-			"name": "Resolucion interna maxima",
-			"description": "Lado maximo (px) de la imagen de trabajo. Mas alto = mas detalle posible pero mas memoria y tiempo."
+			"name": "Maximum internal resolution",
+			"description": "Maximum side (px) of the working image. Higher = more possible detail, but more memory and time."
 		},
 		"alpha-threshold": {
 			"type": "int",
 			"default": 128,
 			"min": 1,
 			"max": 255,
-			"name": "Umbral de transparencia",
-			"description": "Los pixeles con alfa menor que este valor se consideran transparentes y no generan objetos."
+			"name": "Transparency threshold",
+			"description": "Pixels with alpha below this value are treated as transparent and generate no objects."
 		},
 		"title-gd": {
-			"name": "Objetos de Geometry Dash",
+			"name": "Geometry Dash objects",
 			"type": "title"
 		},
 		"color-channel": {
@@ -60,73 +60,73 @@
 			"default": 1010,
 			"min": 1,
 			"max": 1020,
-			"name": "Canal de color",
-			"description": "Canal de color base de los objetos (1010 = negro). <cr>No lo cambies</c> salvo que sepas lo que haces: el color se aplica con HSV sobre este canal."
+			"name": "Color channel",
+			"description": "Base color channel of the objects (1010 = black). <cr>Do not change it</c> unless you know what you are doing: the color is applied with HSV on top of this channel."
 		},
 		"bleed": {
 			"type": "float",
 			"default": 0.15,
 			"min": 0.0,
 			"max": 2.0,
-			"name": "Solape entre rectangulos",
-			"description": "Unidades extra que se ensancha cada rectangulo para evitar lineas finas entre ellos."
+			"name": "Overlap between rectangles",
+			"description": "Extra units each rectangle is widened by, to avoid thin lines between them."
 		},
 		"flip-rotation": {
 			"type": "bool",
 			"default": false,
-			"name": "Invertir giro",
-			"description": "Si los rectangulos rotados (metodos 7 y 8) salen girados al reves, activa esto."
+			"name": "Flip rotation",
+			"description": "If the rotated rectangles (methods 7 and 8) come out rotated the wrong way, enable this."
 		},
 		"select-after": {
 			"type": "bool",
 			"default": true,
-			"name": "Seleccionar al colocar",
-			"description": "Selecciona los objetos importados para poder moverlos de golpe."
+			"name": "Select after placing",
+			"description": "Selects the imported objects so you can move them all at once."
 		},
 		"title-mono": {
-			"name": "Estilos monocromos",
+			"name": "Monochrome styles",
 			"type": "title"
 		},
 		"invert-ink": {
 			"type": "bool",
 			"default": false,
-			"name": "Tinta blanca sobre negro",
-			"description": "Invierte los estilos monocromos: tinta blanca sobre fondo negro (para fondos oscuros)."
+			"name": "White ink on black",
+			"description": "Inverts the monochrome styles: white ink on a black background (for dark backgrounds)."
 		},
 		"black-channel": {
 			"type": "int",
 			"default": 1010,
 			"min": 1,
 			"max": 1020,
-			"name": "Canal negro",
-			"description": "Canal de color usado para la tinta negra en los estilos monocromos (1010 = negro). Solo se usa con \"Blanco y negro con canales 1010/1011\"."
+			"name": "Black channel",
+			"description": "Color channel used for the black ink in the monochrome styles (1010 = black). Only used with \"Black and white with channels 1010/1011\"."
 		},
 		"white-channel": {
 			"type": "int",
 			"default": 1011,
 			"min": 1,
 			"max": 1020,
-			"name": "Canal blanco",
-			"description": "Canal de color usado para el papel blanco en los estilos monocromos (1011 = blanco). Si el papel no sale blanco, cambia este valor. Solo se usa con \"Blanco y negro con canales 1010/1011\"."
+			"name": "White channel",
+			"description": "Color channel used for the white paper in the monochrome styles (1011 = white). If the paper does not come out white, change this value. Only used with \"Black and white with channels 1010/1011\"."
 		},
 		"ascii-advance": {
 			"type": "float",
 			"default": 24.0,
 			"min": 1.0,
 			"max": 400.0,
-			"name": "ASCII: ancho de caracter",
-			"description": "Unidades que ocupa un caracter con escala 1 en la fuente del nivel. <cy>Calibralo</c> si las filas salen mas anchas o estrechas que la imagen."
+			"name": "ASCII: character width",
+			"description": "Units one character takes up at scale 1 in the level font. <cy>Calibrate it</c> if the rows come out wider or narrower than the image."
 		},
 		"ascii-aspect": {
 			"type": "float",
 			"default": 1.0,
 			"min": 0.3,
 			"max": 3.0,
-			"name": "ASCII: alto/ancho de caracter",
-			"description": "Proporcion alto/ancho de una celda de texto. Con fuentes monoespaciadas suele estar entre 1.0 y 2.0."
+			"name": "ASCII: character height/width",
+			"description": "Height/width ratio of a text cell. With monospaced fonts it is usually between 1.0 and 2.0."
 		},
 		"title-palette": {
-			"name": "Canales de color",
+			"name": "Color channels",
 			"type": "title"
 		},
 		"palette-size": {
@@ -134,56 +134,56 @@
 			"default": 48,
 			"min": 4,
 			"max": 200,
-			"name": "Estilos ligeros: canales en color",
-			"description": "Cuantos canales de color usan los estilos ligeros con el check de color (la mitad para las bases, la mitad para la tinta). Mas = colores mas fieles."
+			"name": "Light styles: color channels",
+			"description": "How many color channels the light styles use with the color check (half for the bases, half for the ink). More = more faithful colors."
 		},
 		"palette-first-channel": {
 			"type": "int",
 			"default": 2,
 			"min": 2,
 			"max": 999,
-			"name": "Primer canal de la paleta",
-			"description": "Los canales se buscan desde este numero hacia arriba y se saltan los que el nivel ya usa. Al llegar al 999 se continua en el <cy>1020</c> y sigue hasta el 9999 (1000-1019 son canales especiales de GD y no se tocan). <cr>Nunca se usa el canal 1.</c>"
+			"name": "First palette channel",
+			"description": "Channels are searched upward from this number, skipping the ones the level already uses. After 999 it continues at <cy>1020</c> and goes up to 9999 (1000-1019 are special GD channels and are left alone). <cr>Channel 1 is never used.</c>"
 		},
 		"palette-size-main": {
 			"type": "int",
 			"default": 64,
 			"min": 2,
 			"max": 250,
-			"name": "Metodos 1-8: canales en color",
-			"description": "Cuantos canales de color usa cada imagen de los metodos principales con el check <cy>Canales de color</c> (con grises se usan como mucho 32)."
+			"name": "Methods 1-8: color channels",
+			"description": "How many color channels each image uses in the main methods with the <cy>Channels</c> check (with grays, at most 32 are used)."
 		},
 		"light-special-channels": {
 			"type": "bool",
 			"default": false,
-			"name": "Blanco y negro con canales 1010/1011",
-			"description": "Los estilos ligeros en blanco y negro usan por defecto 2 canales libres. Activalo para usar los canales especiales 1010 (negro) y 1011 (blanco) en su lugar."
+			"name": "Black and white with channels 1010/1011",
+			"description": "The light black-and-white styles use 2 free channels by default. Enable this to use the special channels 1010 (black) and 1011 (white) instead."
 		},
 		"ascii-chunk": {
 			"type": "int",
 			"default": 60,
 			"min": 8,
 			"max": 400,
-			"name": "ASCII: caracteres por objeto",
-			"description": "Las filas largas se parten en objetos de texto de este tamano y se colocan seguidos (evita que GD recorte o entrecorte el texto). En color se usan trozos mas cortos."
+			"name": "ASCII: characters per object",
+			"description": "Long rows are split into text objects of this size and placed one after another (this keeps GD from clipping or breaking up the text). In color, shorter pieces are used."
 		},
 		"ascii-kerning": {
 			"type": "int",
 			"default": 0,
 			"min": -100,
 			"max": 100,
-			"name": "ASCII: espaciado de letras",
-			"description": "Espaciado entre caracteres de los objetos de texto (clave 488). Dejalo en 0 salvo que las letras salgan separadas o pegadas."
+			"name": "ASCII: letter spacing",
+			"description": "Spacing between the characters of the text objects (key 488). Leave it at 0 unless the letters come out too far apart or too close together."
 		},
 		"title-debug": {
-			"name": "Diagnostico",
+			"name": "Diagnostics",
 			"type": "title"
 		},
 		"dump-ui": {
 			"type": "bool",
 			"default": false,
-			"name": "Guardar diagnostico de la interfaz (txt)",
-			"description": "Escribe <cy>ui-dump.txt</c> en la carpeta de guardado del mod con TODO lo de la interfaz: todas las ventanas abiertas (la del mod, el cuadro de info y los ajustes), cada nodo con su posicion, tamano, escala, color y caja real en pantalla, los textos literales (con los glifos que la fuente no tiene), la separacion real entre lineas, solapes y desbordes. Guarda una instantanea al abrir la ventana, al cambiar de pestana, al abrir info, al abrir ajustes y al calcular una imagen. La ruta aparece en una notificacion al abrir la ventana. Mandame ese txt para arreglar la interfaz."
+			"name": "Save interface diagnostics (txt)",
+			"description": "Writes <cy>ui-dump.txt</c> to the mod's save folder with EVERYTHING about the interface: all open windows (the mod's, the info box and the settings), every node with its position, size, scale, color and real on-screen box, the literal texts (with the glyphs the font does not have), the real spacing between lines, overlaps and overflows. It saves a snapshot when the window opens, when you switch tabs, when you open info, when you open settings and when an image is calculated. The path appears in a notification when the window opens. Send me that txt to fix the interface."
 		}
 	},
 	"tags": [

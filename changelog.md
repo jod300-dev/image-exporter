@@ -1,30 +1,33 @@
 # v1.0.0
-- Primera version: 8 metodos de conversion, limite duro de 10.000 objetos, vista previa y colocacion en el editor.
+- First version: 8 conversion methods, hard limit of 10,000 objects, preview and placement in the editor.
 
 # v1.1.0
-- 9 estilos monocromos (halftone, grabado, cross-hatch, estarcido, Bayer, tinta, trazos, espiral, 10 PRINT) sin HSV por objeto.
-- Indicador del tamano aproximado de la cadena (~KB).
-- Tono 0 exacto: ya no desplaza 1 grado (menos error de color en rojos puros).
+- 9 monochrome styles (halftone, engraving, cross-hatch, stippling, Bayer, ink, strokes, spiral, 10 PRINT) with no per-object HSV.
+- Approximate level-string size indicator (~KB).
+- Exact hue 0: it no longer shifts by 1 degree (less color error on pure reds).
 
 # v1.1.1
-- Metodos 7 y 8: los rectangulos girados ya no sobresalen del borde de la imagen (en GD no se pueden recortar y dejaban restos fuera del cuadro). La imagen queda como un cuadro limpio; la calidad (PSNR) casi no cambia.
-- Nuevo ajuste *Guardar diagnostico de la interfaz (txt)*: escribe ui-dump.txt con el arbol de nodos de la ventana (posicion, tamano, escala, caja real en pantalla), los solapes y lo que se sale del marco, mas el estado del mod y del resultado.
+- Methods 7 and 8: rotated rectangles no longer stick out past the image border (GD cannot clip them, so they left leftovers outside the frame). The image is now a clean rectangle; quality (PSNR) barely changes.
+- New setting *Save interface diagnostics (txt)*: writes ui-dump.txt with the window's node tree (position, size, scale, real on-screen box), the overlaps and what falls outside the frame, plus the mod and result state.
 
 # v1.1.2
-- Corregido el error de compilacion en Windows (una variable llamada "small" chocaba con una macro de Windows) y la advertencia de localtime.
+- Fixed the Windows compile error (a variable named "small" clashed with a Windows macro) and the localtime warning.
 
 # v1.1.3
-- Interfaz reacomodada a partir del ui-dump.txt: Ajustes ya no se sale del marco ni tapa la pestana "Ligeros"; las pestanas ya no pisan el titulo; las perillas de los sliders ya no pisan sus etiquetas (Objetos / Lado largo); botones mas bajos, ventana un poco mas alta (288) y descripcion/nota ancladas arriba para que 3 lineas no choquen con lo de abajo.
+- Interface re-laid out from ui-dump.txt: Settings no longer falls outside the frame or covers the "Light" tab; the tabs no longer overlap the title; the slider knobs no longer cover their labels (Objects / Long side); lower buttons, a slightly taller window (288), and the description/note anchored at the top so 3 lines do not collide with what is below.
 
 # v1.1.4
-- Los textos vuelven a ser ASCII puro: la fuente de GD no tiene tildes ni enie y esos caracteres desaparecian ("Rectngulos", "bsqueda").
-- Descripcion del metodo y nota de estado: ahora cada linea es una etiqueta propia con separacion fija. Se acabo el hueco enorme entre la primera y la segunda linea.
-- Las pestanas Principales / Ligeros mantienen en azul la activa (el boton invertia su estado despues del clic y las dos quedaban grises). Los checks Canales / Gris HSV / Gris canales tenian el mismo fallo y tambien quedan sincronizados.
-- Ajustes pasa abajo a la izquierda, en la misma fila y con el mismo tamano que Imagen y Colocar.
-- El boton de info abre un cuadro propio (400x250, sin scroll): texto partido a mano, alineado a la izquierda, con colores por parrafo y el boton OK siempre visible. Ya no se sale de la pantalla ni recorta lineas.
-- Diagnostico de UI (ajuste "Guardar diagnostico de la interfaz"): ahora vuelca TODO. Escena completa y arbol entero de cada ventana abierta (mod, info, ajustes de Geode, avisos), con posicion, ancla, tamano, escala, sesgo, rotacion, color, opacidad, hijos y caja real en pantalla; textos literales con sus bytes, glifos que la fuente no tiene, numero de lineas y separacion real entre lineas; resumen de textos y de botones; solapes y desbordes. Guarda una instantanea al abrir la ventana, al cambiar de pestana, al abrir info, al abrir ajustes y al calcular, todas en el mismo ui-dump.txt.
+- Texts are plain ASCII again: the GD font has no accents or special letters, and those characters disappeared.
+- Method description and status note: each line is now its own label with fixed spacing. The huge gap between the first and second line is gone.
+- The Main / Light tabs keep the active one blue (the button flipped its state after the click and both turned gray). The Channels / Gray HSV / Gray channels checks had the same bug and are now in sync too.
+- Settings moves to the bottom left, on the same row and with the same size as Image and Place.
+- The info button opens a custom box (400x250, no scroll): hand-wrapped text, left aligned, with a color per paragraph and the OK button always visible. It no longer runs off the screen or clips lines.
+- UI diagnostics (setting "Save interface diagnostics"): it now dumps EVERYTHING. The whole scene and the full tree of every open window (mod, info, Geode settings, alerts), with position, anchor, size, scale, skew, rotation, color, opacity, children and real on-screen box; literal texts with their bytes, glyphs the font does not have, line count and real line spacing; text and button summaries; overlaps and overflows. It saves a snapshot when the window opens, on tab change, when opening info, when opening settings and on calculate, all in the same ui-dump.txt.
 
 # v1.1.5
-- Canales de color: al acabarse los canales 2-999 ya no se vuelve a HSV; el reparto continua en el 1020 y sigue hasta el 9999, saltando 1000-1019 (canales especiales de GD: BG, G1, G2, negro, blanco...). Hay hasta 9978 canales utilizables en vez de 998.
-- Canales: el mod recuerda los canales que ya reparti en el editor abierto y los suma a los detectados en el nivel (objetos, colores definidos y canales copiados por otro canal), tambien en el tramo 1020+. Una imagen nueva siempre salta los canales ocupados y usa el siguiente libre, asi no se mezclan los colores con los de una imagen anterior.
-- El diagnostico de UI ahora incluye una seccion CANALES DE COLOR (ocupados detectados, ocupados >= 1000, libres, reservados) y el log muestra el rango asignado al colocar.
+- Color channels: when channels 2-999 run out it no longer falls back to HSV; the allocation continues at 1020 and goes up to 9999, skipping 1000-1019 (special GD channels: BG, G1, G2, black, white...). Up to 9,978 channels are usable instead of 998.
+- Channels: the mod remembers the channels it already handed out in the open editor and adds them to the ones detected in the level (objects, defined colors and channels copied by another channel), also in the 1020+ range. A new image always skips occupied channels and uses the next free one, so colors do not mix with those of a previous image.
+- The UI diagnostics now include a COLOR CHANNELS section (occupied detected, occupied >= 1000, free, reserved) and the log shows the assigned range when placing.
+
+# v1.1.6
+- The whole mod is now in English: interface, info box, notifications, settings, diagnostics, documentation and test output. The "Calculation quality" setting now uses Fast / Normal / High / Maximum (old saved Spanish values still work).
